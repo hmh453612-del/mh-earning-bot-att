@@ -18,27 +18,24 @@ SUPPORT_USERNAME = "mh_earning_bot_admin"
 # ফায়ারবেস ডেটাবেস ইউআরএল (Firebase RTDB)
 FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# রিওয়ার্ড ও জোন সেটিংস
+# রিওয়ার্ড সেটিংস
 AD_REWARD = 10.00
 REFER_REWARD = 50.00
-MONETAG_ZONE_1 = "11465475"
-MONETAG_ZONE_2 = "11483169"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # =================================================================
-# 🌐 Render Free Tier Keep-Alive Server (২৪ ঘণ্টা সচল রাখার জন্য)
+# 🌐 Render Keep-Alive Web Server (২৪ ঘণ্টা সচল রাখার জন্য)
 # =================================================================
 app = Flask(__name__)
 
 
 @app.route("/")
 def home():
-    return "MH Earning Bot & Database Auto-Sync Engine is Active 24/7!"
+    return "MH Earning Bot Server is Active 24/7!"
 
 
 def run_web_server():
-    # Render-এর দেওয়া পোর্টে ওয়েব সার্ভার রান করবে
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
@@ -47,7 +44,6 @@ def run_web_server():
 # 🔥 Firebase Helper Functions (ডাটা সিঙ্ক ইঞ্জিন)
 # =================================================================
 def get_user_from_db(user_id):
-    """ফায়ারবেস থেকে ইউজারের ডাটা রিড করা"""
     try:
         url = f"{FIREBASE_DB_URL}/users/{user_id}.json"
         res = requests.get(url, timeout=5)
@@ -59,7 +55,6 @@ def get_user_from_db(user_id):
 
 
 def update_user_in_db(user_id, data):
-    """ফায়ারবেসে ডাটা আপডেট করা"""
     try:
         url = f"{FIREBASE_DB_URL}/users/{user_id}.json"
         requests.patch(url, json=data, timeout=5)
@@ -68,12 +63,10 @@ def update_user_in_db(user_id, data):
 
 
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
-    """নতুন ইউজার তৈরি ও রেফারেল বোনাস সিঙ্ক করা"""
     user_id_str = str(user_id)
     user_data = get_user_from_db(user_id_str)
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # ইউজার নতুন হলে ডাটাবেসে এন্ট্রি করা
     if not user_data:
         new_user = {
             "telegramId": user_id_str,
@@ -90,7 +83,6 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
         }
         update_user_in_db(user_id_str, new_user)
 
-        # রেফারারকে টাকা ও রেফারেল কাউন্টার বাড়ানো
         if referrer_id and referrer_id != user_id_str and referrer_id != "guest_12345678":
             referrer_data = get_user_from_db(referrer_id)
             if referrer_data:
@@ -118,7 +110,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
                         int(referrer_id),
                         f"🎉 <b>অভিনন্দন! নতুন রেফারেল যুক্ত হয়েছে!</b>\n\n"
                         f"👤 ব্যবহারকারী: <b>{full_name}</b>\n"
-                        f"💰 আপনার ব্যালেন্সে <b>৳ {REFER_REWARD:.2f}</b> যোগ করা হয়েছে!",
+                        f"💰 আপনার একাউন্টে <b>৳ {REFER_REWARD:.2f}</b> যোগ করা হয়েছে!",
                     )
                 except Exception:
                     pass
@@ -211,13 +203,13 @@ def send_welcome(message):
 
     bot.send_message(
         message.chat.id,
-        "👇 <b>নিচের মেনু বাটন ব্যবহার করে অপশন সিলেক্ট করুন:</b>",
+        "👇 <b>নিচের বাটনগুলো ব্যবহার করে কাজ ও ব্যালেন্স চেক করুন:</b>",
         reply_markup=get_main_keyboard(),
     )
 
 
 # =================================================================
-# ২. /কাজ এবং '💼 কাজ' বাটন হ্যান্ডলার (Monetag Video Ads)
+# ২. /কাজ এবং '💼 কাজ' বাটন হ্যান্ডলার (সরাসরি অ্যাড দেখার বাটন)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["💼 কাজ", "/কাজ", "কাজ"])
 def task_handler(message):
@@ -228,27 +220,28 @@ def task_handler(message):
     ads_watched = int(user_data.get("adsWatched", 0))
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
-    btn_watch_video = types.InlineKeyboardButton(
-        text=f"▶️ ভিডিও অ্যাড দেখুন (৳ {AD_REWARD:.2f})",
+    
+    # এই বাটনে চাপলে ইউজার সরাসরি মনিটেক ভিডিও বিজ্ঞাপন দেখার স্ক্রিনে চলে যাবে
+    btn_watch_ad = types.InlineKeyboardButton(
+        text="🎬 ভিডিও অ্যাড দেখুন (৳ ১০.০০)",
         web_app=types.WebAppInfo(url=webapp_url),
     )
-    btn_social_tasks = types.InlineKeyboardButton(
-        text="📋 অন্যান্য সোশ্যাল টাস্ক সম্পন্ন করুন",
+    btn_tasks = types.InlineKeyboardButton(
+        text="📋 অন্যান্য সোশ্যাল টাস্ক",
         web_app=types.WebAppInfo(url=webapp_url),
     )
-    task_kb.add(btn_watch_video, btn_social_tasks)
+    task_kb.add(btn_watch_ad, btn_tasks)
 
     msg_text = f"""💼 <b>দৈনিক ভিডিও অ্যাড ও ইনকাম টাস্ক</b>
 ━━━━━━━━━━━━━━━━━━━━
-<blockquote>✨ <b>Monetag স্পন্সরড ভিডিও অ্যাড:</b>
-▫️ <b>Zone 1 Server:</b> <code>{MONETAG_ZONE_1}</code> (Active ✅)
-▫️ <b>Zone 2 Server:</b> <code>{MONETAG_ZONE_2}</code> (Active ✅)
+<blockquote>🎬 <b>ভিডিও বিজ্ঞাপন দেখে ইনকাম:</b>
+প্রতিটি ভিডিও বিজ্ঞাপন দেখার জন্য পাবেন <b>৳ {AD_REWARD:.2f}</b> টাকা!
 
-💰 <b>প্রতি ভিডিও অ্যাডে আয়:</b> <b>৳ {AD_REWARD:.2f}</b> টাকা
 📊 <b>আজ সম্পন্ন করেছেন:</b> <b>{ads_watched} / 10</b> টি অ্যাড
-⚡ <b>পদ্ধতি:</b> নিচের বাটনে ক্লিক করে বিজ্ঞাপনটি সম্পূর্ণ দেখুন। দেখা শেষ হলে ব্যালেন্স স্বয়ংক্রিয়ভাবে যোগ হবে।</blockquote>
+💰 <b>প্রতি রেফারে বোনাস:</b> <b>৳ {REFER_REWARD:.2f}</b> টাকা
+⚡ <b>নিয়ম:</b> নিচের বাটনে ক্লিক করে বিজ্ঞাপনটি সম্পূর্ণ দেখুন। দেখা শেষ হলেই আপনার একাউন্টে স্বয়ংক্রিয়ভাবে টাকা যোগ হয়ে যাবে।</blockquote>
 
-👇 <i>ভিডিও অ্যাড দেখতে নিচের বাটনে চাপুন:</i>"""
+👇 <i>বিজ্ঞাপন দেখতে নিচের বাটনে ট্যাপ করুন:</i>"""
 
     bot.send_message(
         message.chat.id,
@@ -287,12 +280,12 @@ def balance_handler(message):
 <blockquote>🏷️ <b>নাম:</b> {user_name}
 🆔 <b>আইডি:</b> <code>{user_id}</code>
 
-💵 <b>মোট ব্যালেন্স:</b> <b>৳ {balance:.2f}</b> টাকা
-👥 <b>সফল রেফারেল:</b> <b>{referrals}</b> জন
+💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {balance:.2f}</b> টাকা
+👥 <b>মোট সফল রেফার:</b> <b>{referrals}</b> জন
 🎬 <b>আজকের দেখা অ্যাড:</b> <b>{ads_watched}</b> টি
 ✅ <b>টাস্ক সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
 
-📌 <i>ব্যালেন্স তুলতে নিচের বাটনে চাপ দিন:</i>"""
+📌 <i>ব্যালেন্স উইথড্র করতে নিচের বাটনে চাপুন:</i>"""
 
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
@@ -354,7 +347,7 @@ def support_handler(message):
 
     msg_text = f"""🛠️ <b>হেল্প ও সাপোর্ট সেন্টার</b>
 ━━━━━━━━━━━━━━━━━━━━
-<blockquote>বট বা পেমেন্ট সংক্রান্ত যেকোনো সমস্যায় এডমিনের সাথে যোগাযোগ করুন।
+<blockquote>বট বা পেমেন্ট সংক্রান্ত যেকোনো প্রয়োজনে সরাসরি এডমিনের সাথে কথা বলুন।
 
 ⏰ <b>সাপোর্ট সময়:</b> প্রতিদিন সকাল ৯:০০ টা - রাত ১১:০০ টা
 👤 <b>অফিসিয়াল এডমিন:</b> @{SUPPORT_USERNAME}</blockquote>
@@ -365,13 +358,13 @@ def support_handler(message):
 
 
 # =================================================================
-# 🚀 বট স্টার্টার
+# 🚀 মেইন রানার
 # =================================================================
 if __name__ == "__main__":
-    print("🌐 Web Server চালু হচ্ছে...")
+    print("🌐 Keep-Alive Web Server চালু হচ্ছে...")
     server_thread = threading.Thread(target=run_web_server)
     server_thread.daemon = True
     server_thread.start()
 
-    print("✅ MH Earning Bot সফলভাবে কানেক্ট হয়েছে...")
+    print("✅ MH Earning Bot সফলভাবে চালু হয়েছে...")
     bot.infinity_polling()

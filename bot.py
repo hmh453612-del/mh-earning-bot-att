@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 import threading
 import urllib.parse
@@ -6,6 +5,7 @@ from flask import Flask
 import requests
 import telebot
 from telebot import types
+from datetime import datetime
 
 # =================================================================
 # ⚙️ কনফিগারেশন সেটিংস (Configuration)
@@ -15,33 +15,28 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-# ফায়ারবেস ডেটাবেস ইউআরএল (Firebase RTDB)
 FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# রিওয়ার্ড সেটিংস
 AD_REWARD = 10.00
 REFER_REWARD = 50.00
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # =================================================================
-# 🌐 Render Keep-Alive Web Server (২৪ ঘণ্টা সচল রাখার জন্য)
+# 🌐 Render Keep-Alive Server
 # =================================================================
 app = Flask(__name__)
 
-
-@app.route("/")
+@app.route('/')
 def home():
-    return "MH Earning Bot Server is Active 24/7!"
-
+    return "MH Earning Bot Auto-Ad Server is Running 24/7!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-
 # =================================================================
-# 🔥 Firebase Helper Functions (ডাটা সিঙ্ক ইঞ্জিন)
+# 🔥 Firebase Helper Functions
 # =================================================================
 def get_user_from_db(user_id):
     try:
@@ -53,14 +48,12 @@ def get_user_from_db(user_id):
         print(f"Firebase Read Error: {e}")
     return None
 
-
 def update_user_in_db(user_id, data):
     try:
         url = f"{FIREBASE_DB_URL}/users/{user_id}.json"
         requests.patch(url, json=data, timeout=5)
     except Exception as e:
         print(f"Firebase Update Error: {e}")
-
 
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
     user_id_str = str(user_id)
@@ -79,7 +72,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
             "completedTasksCount": 0,
             "rejectedCount": 0,
             "joinedAt": int(datetime.now().timestamp() * 1000),
-            "referredBy": referrer_id if (referrer_id and referrer_id != user_id_str) else None,
+            "referredBy": referrer_id if (referrer_id and referrer_id != user_id_str) else None
         }
         update_user_in_db(user_id_str, new_user)
 
@@ -89,18 +82,15 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
                 cur_bal = float(referrer_data.get("balance", 0.0))
                 cur_ref = int(referrer_data.get("referrals", 0))
 
-                update_user_in_db(
-                    referrer_id,
-                    {
-                        "balance": cur_bal + REFER_REWARD,
-                        "referrals": cur_ref + 1,
-                    },
-                )
+                update_user_in_db(referrer_id, {
+                    "balance": cur_bal + REFER_REWARD,
+                    "referrals": cur_ref + 1
+                })
 
                 ref_item = {
                     "id": user_id_str,
                     "name": full_name,
-                    "joinedAt": int(datetime.now().timestamp() * 1000),
+                    "joinedAt": int(datetime.now().timestamp() * 1000)
                 }
                 try:
                     ref_list_url = f"{FIREBASE_DB_URL}/users/{referrer_id}/myReferrals/{user_id_str}.json"
@@ -110,28 +100,23 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
                         int(referrer_id),
                         f"🎉 <b>অভিনন্দন! নতুন রেফারেল যুক্ত হয়েছে!</b>\n\n"
                         f"👤 ব্যবহারকারী: <b>{full_name}</b>\n"
-                        f"💰 আপনার একাউন্টে <b>৳ {REFER_REWARD:.2f}</b> যোগ করা হয়েছে!",
+                        f"💰 আপনার একাউন্টে <b>৳ {REFER_REWARD:.2f}</b> যোগ করা হয়েছে!"
                     )
                 except Exception:
                     pass
     else:
-        update_user_in_db(
-            user_id_str,
-            {"name": full_name, "username": f"@{username}" if username else "N/A"},
-        )
-
+        update_user_in_db(user_id_str, {
+            "name": full_name,
+            "username": f"@{username}" if username else "N/A"
+        })
 
 # =================================================================
-# ⌨️ কাস্টম কিবোর্ড বাটন (Custom Reply Keyboard)
+# ⌨️ কাস্টম কিবোর্ড বাটন
 # =================================================================
 def get_main_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-
-    # সারি ১: [ কাজ | ব্যালেন্স ]
     btn_task = types.KeyboardButton("💼 কাজ")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স")
-
-    # সারি ২: [ রেফার | সাপোর্ট ]
     btn_refer = types.KeyboardButton("👥 রেফার")
     btn_support = types.KeyboardButton("🛠️ সাপোর্ট")
 
@@ -139,11 +124,10 @@ def get_main_keyboard():
     keyboard.row(btn_refer, btn_support)
     return keyboard
 
-
 # =================================================================
-# ১. /start কমান্ড হ্যান্ডলার
+# ১. /start কমান্ড
 # =================================================================
-@bot.message_handler(commands=["start"])
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = str(message.from_user.id)
     full_name = message.from_user.first_name or "User"
@@ -156,10 +140,7 @@ def send_welcome(message):
     if len(args) > 1:
         referrer_id = args[1].strip()
 
-    threading.Thread(
-        target=handle_referral_and_user_creation,
-        args=(user_id, full_name, username, referrer_id),
-    ).start()
+    threading.Thread(target=handle_referral_and_user_creation, args=(user_id, full_name, username, referrer_id)).start()
 
     referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
 
@@ -167,13 +148,10 @@ def send_welcome(message):
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
     btn_webapp = types.InlineKeyboardButton(
         text="Open MH Earning Bot 📱",
-        web_app=types.WebAppInfo(url=webapp_url),
+        web_app=types.WebAppInfo(url=webapp_url)
     )
 
-    share_text = (
-        f"🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন টাকা ইনকাম করুন!\n\n"
-        f"🚀 প্রতি রেফারে পাবেন ৫০ টাকা!\n\n👉 জয়েন লিংক: {referral_link}"
-    )
+    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ৫০ টাকা!\n\n👉 জয়েন লিংক: {referral_link}"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
     btn_share = types.InlineKeyboardButton(text="রেফার শেয়ার করুন 📢", url=share_url)
 
@@ -194,69 +172,50 @@ def send_welcome(message):
 🔗 <b>আপনার রেফারেল লিংক:</b>
 <code>{referral_link}</code>"""
 
-    bot.send_message(
-        message.chat.id,
-        welcome_text,
-        reply_markup=inline_kb,
-        disable_web_page_preview=True,
-    )
-
-    bot.send_message(
-        message.chat.id,
-        "👇 <b>নিচের বাটনগুলো ব্যবহার করে কাজ ও ব্যালেন্স চেক করুন:</b>",
-        reply_markup=get_main_keyboard(),
-    )
-
+    bot.send_message(message.chat.id, welcome_text, reply_markup=inline_kb, disable_web_page_preview=True)
+    bot.send_message(message.chat.id, "👇 <b>নিচের বাটনগুলো ব্যবহার করে কাজ ও ব্যালেন্স চেক করুন:</b>", reply_markup=get_main_keyboard())
 
 # =================================================================
-# ২. /কাজ এবং '💼 কাজ' বাটন হ্যান্ডলার (সরাসরি অ্যাড দেখার বাটন)
+# ২. /কাজ কমান্ড (সরাসরি অটোমেটিক অ্যাড ওপেন করবে)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["💼 কাজ", "/কাজ", "কাজ"])
 def task_handler(message):
     user_id = str(message.from_user.id)
-    webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
+    
+    # 💥 এই লিংকে ক্লিক করলে মিনি অ্যাপ নিজে থেকেই ভিডিও অ্যাড প্লে করে দিবে
+    auto_ad_webapp_url = f"{MINI_APP_URL}#action=watch_ad&tgWebAppStartParam={user_id}"
+    normal_webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
 
     user_data = get_user_from_db(user_id) or {}
     ads_watched = int(user_data.get("adsWatched", 0))
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
-    
-    # এই বাটনে চাপলে ইউজার সরাসরি মনিটেক ভিডিও বিজ্ঞাপন দেখার স্ক্রিনে চলে যাবে
-    btn_watch_ad = types.InlineKeyboardButton(
-        text="🎬 ভিডিও অ্যাড দেখুন (৳ ১০.০০)",
-        web_app=types.WebAppInfo(url=webapp_url),
+    btn_watch_video = types.InlineKeyboardButton(
+        text="🎬 সরাসরি ভিডিও অ্যাড দেখুন (৳ ১০.০০)",
+        web_app=types.WebAppInfo(url=auto_ad_webapp_url)
     )
-    btn_tasks = types.InlineKeyboardButton(
-        text="📋 অন্যান্য সোশ্যাল টাস্ক",
-        web_app=types.WebAppInfo(url=webapp_url),
+    btn_social_tasks = types.InlineKeyboardButton(
+        text="📋 অন্যান্য টাস্ক ড্যাশবোর্ড",
+        web_app=types.WebAppInfo(url=normal_webapp_url)
     )
-    task_kb.add(btn_watch_ad, btn_tasks)
+    task_kb.add(btn_watch_video, btn_social_tasks)
 
     msg_text = f"""💼 <b>দৈনিক ভিডিও অ্যাড ও ইনকাম টাস্ক</b>
 ━━━━━━━━━━━━━━━━━━━━
-<blockquote>🎬 <b>ভিডিও বিজ্ঞাপন দেখে ইনকাম:</b>
-প্রতিটি ভিডিও বিজ্ঞাপন দেখার জন্য পাবেন <b>৳ {AD_REWARD:.2f}</b> টাকা!
+<blockquote>🎬 <b>ভিডিও বিজ্ঞাপন রিওয়ার্ড:</b>
+প্রতিটি ভিডিও সম্পূর্ণ দেখলে পাবেন <b>৳ {AD_REWARD:.2f}</b> টাকা!
 
 📊 <b>আজ সম্পন্ন করেছেন:</b> <b>{ads_watched} / 10</b> টি অ্যাড
-💰 <b>প্রতি রেফারে বোনাস:</b> <b>৳ {REFER_REWARD:.2f}</b> টাকা
-⚡ <b>নিয়ম:</b> নিচের বাটনে ক্লিক করে বিজ্ঞাপনটি সম্পূর্ণ দেখুন। দেখা শেষ হলেই আপনার একাউন্টে স্বয়ংক্রিয়ভাবে টাকা যোগ হয়ে যাবে।</blockquote>
+⚡ <b>নিয়ম:</b> নিচের <b>"সরাসরি ভিডিও অ্যাড দেখুন"</b> বাটনে চাপ দিলেই স্বয়ংক্রিয়ভাবে ভিডিও চালু হয়ে যাবে। ভিডিও শেষ হলে একাউন্টে টাকা যোগ হবে।</blockquote>
 
 👇 <i>বিজ্ঞাপন দেখতে নিচের বাটনে ট্যাপ করুন:</i>"""
 
-    bot.send_message(
-        message.chat.id,
-        msg_text,
-        reply_markup=task_kb,
-        disable_web_page_preview=True,
-    )
-
+    bot.send_message(message.chat.id, msg_text, reply_markup=task_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৩. /ব্যালেন্স এবং '💰 ব্যালেন্স' বাটন হ্যান্ডলার
+# ৩. /ব্যালেন্স কমান্ড
 # =================================================================
-@bot.message_handler(
-    func=lambda msg: msg.text in ["💰 ব্যালেন্স", "/ব্যালেন্স", "ব্যালেন্স"]
-)
+@bot.message_handler(func=lambda msg: msg.text in ["💰 ব্যালেন্স", "/ব্যালেন্স", "ব্যালেন্স"])
 def balance_handler(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name or "User"
@@ -270,8 +229,8 @@ def balance_handler(message):
 
     bal_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_open_wallet = types.InlineKeyboardButton(
-        text="💳 ওয়ালেট ওপেন ও টাকা তুলুন (bKash/Nagad)",
-        web_app=types.WebAppInfo(url=webapp_url),
+        text="💳 ওয়ালেট ওপেন ও টাকা তুলুন",
+        web_app=types.WebAppInfo(url=webapp_url)
     )
     bal_kb.add(btn_open_wallet)
 
@@ -289,9 +248,8 @@ def balance_handler(message):
 
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
-
 # =================================================================
-# ৪. /রেফার এবং '👥 রেফার' বাটন হ্যান্ডলার
+# ৪. /রেফার কমান্ড
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 রেফার", "/রেফার", "রেফার"])
 def refer_handler(message):
@@ -302,10 +260,7 @@ def refer_handler(message):
     total_refs = int(user_data.get("referrals", 0))
     earned_from_refs = total_refs * REFER_REWARD
 
-    share_text = (
-        f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n\n"
-        f"👉 রেফারেল লিংক: {referral_link}"
-    )
+    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n\n👉 রেফারেল লিংক: {referral_link}"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
 
     ref_kb = types.InlineKeyboardMarkup(row_width=1)
@@ -323,25 +278,17 @@ def refer_handler(message):
 
 <i>(লিংকটিতে একবার চাপ দিলেই কপি হয়ে যাবে)</i>"""
 
-    bot.send_message(
-        message.chat.id,
-        msg_text,
-        reply_markup=ref_kb,
-        disable_web_page_preview=True,
-    )
-
+    bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৫. /সাপোর্ট এবং '🛠️ সাপোর্ট' বাটন হ্যান্ডলার
+# ৫. /সাপোর্ট কমান্ড
 # =================================================================
-@bot.message_handler(
-    func=lambda msg: msg.text in ["🛠️ সাপোর্ট", "/সাপোর্ট", "সাপোর্ট"]
-)
+@bot.message_handler(func=lambda msg: msg.text in ["🛠️ সাপোর্ট", "/সাপোর্ট", "সাপোর্ট"])
 def support_handler(message):
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_admin = types.InlineKeyboardButton(
         text="👨‍💻 এডমিনের সাথে যোগাযোগ করুন",
-        url=f"https://t.me/{SUPPORT_USERNAME}",
+        url=f"https://t.me/{SUPPORT_USERNAME}"
     )
     sup_kb.add(btn_admin)
 
@@ -356,10 +303,6 @@ def support_handler(message):
 
     bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
 
-
-# =================================================================
-# 🚀 মেইন রানার
-# =================================================================
 if __name__ == "__main__":
     print("🌐 Keep-Alive Web Server চালু হচ্ছে...")
     server_thread = threading.Thread(target=run_web_server)

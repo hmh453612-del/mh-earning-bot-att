@@ -1,7 +1,7 @@
+from datetime import datetime
 import os
 import threading
 import urllib.parse
-from datetime import datetime
 from flask import Flask
 import requests
 import telebot
@@ -15,7 +15,9 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
+FIREBASE_DB_URL = (
+    "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
+)
 
 AD_REWARD = 10.00
 REFER_REWARD = 50.00
@@ -30,7 +32,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "MH Earning Bot Instant Referral Engine is Running 24/7!"
+    return "MH Earning Bot Premium Engine is Running 24/7!"
 
 
 def run_web_server():
@@ -70,7 +72,6 @@ def handle_referral_and_user_creation(
     today_date = now.strftime("%Y-%m-%d")
     formatted_time = now.strftime("%I:%M %p | %d/%m/%Y")
 
-    # যদি ইউজার পূর্বে জয়েন না করে থাকে (একদম নতুন)
     if not user_data:
         new_user = {
             "telegramId": user_id_str,
@@ -91,7 +92,6 @@ def handle_referral_and_user_creation(
         }
         update_user_in_db(user_id_str, new_user)
 
-        # রেফারকারী থাকলে তাকে তাৎক্ষণিক টাকা যোগ করা ও মেসেজ দেওয়া
         if (
             referrer_id
             and referrer_id != user_id_str
@@ -105,7 +105,6 @@ def handle_referral_and_user_creation(
                 new_balance = cur_bal + REFER_REWARD
                 new_ref_count = cur_ref + 1
 
-                # ফায়ারবেস আপডেট
                 update_user_in_db(
                     referrer_id,
                     {"balance": new_balance, "referrals": new_ref_count},
@@ -121,39 +120,38 @@ def handle_referral_and_user_creation(
                     ref_list_url = f"{FIREBASE_DB_URL}/users/{referrer_id}/myReferrals/{user_id_str}.json"
                     requests.put(ref_list_url, json=ref_item, timeout=4)
 
-                    # 🌟 রেফারকারীর জন্য আকর্ষণীয় বাটন
                     notify_kb = types.InlineKeyboardMarkup(row_width=2)
                     webapp_url = (
                         f"{MINI_APP_URL}#tgWebAppStartParam={referrer_id}"
                     )
                     btn_wallet = types.InlineKeyboardButton(
-                        text="💳 ওয়ালেট ও ব্যালেন্স দেখুন",
+                        text="💳 ওয়ালেট ব্যালেন্স",
                         web_app=types.WebAppInfo(url=webapp_url),
                     )
 
-                    share_link = f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
+                    share_link = (
+                        f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
+                    )
                     share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n👉 জয়েন লিংক: {share_link}"
                     share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
                     btn_more_ref = types.InlineKeyboardButton(
-                        text="📢 আরও রেফার করুন", url=share_url
+                        text="📢 আরও রেফার", url=share_url
                     )
 
                     notify_kb.add(btn_wallet, btn_more_ref)
 
-                    # 🌟 প্রফেশনাল ও আকর্ষণীয় রেফারেল মেসেজ
-                    notify_text = f"""🎊 <b>অভিনন্দন! আপনি সফলভাবে রেফার করেছেন!</b> 🚀
+                    notify_text = f"""🎉 <b>অভিনন্দন! সফল রেফারেল!</b> 🚀
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>👤 <b>নতুন সদস্য:</b> {full_name}
-🆔 <b>ইউজার আইডি:</b> <code>{user_id_str}</code>
-📅 <b>রেফারের সময়:</b> {formatted_time}
+<blockquote>👤 <b>সদস্য:</b> {full_name}
+🆔 <b>আইডি:</b> <code>{user_id_str}</code>
+⏰ <b>সময়:</b> {formatted_time}
 
-💰 <b>অর্জিত রেফারেল বোনাস:</b> <b>+ ৳ {REFER_REWARD:.2f} টাকা</b>
-👥 <b>আপনার সর্বমোট রেফার:</b> <b>{new_ref_count} জন</b>
-💵 <b>বর্তমান মোট ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
+💎 <b>রেফার বোনাস:</b> <b>+ ৳ {REFER_REWARD:.2f} টাকা</b>
+👥 <b>সর্বমোট রেফার:</b> <b>{new_ref_count} জন</b>
+💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
 
-⚡ <i>আপনার রেফারেল বোনাসের টাকা মূল ব্যালেন্সে স্বয়ংক্রিয়ভাবে যোগ করা হয়েছে। বন্ধুদের সাথে লিংক শেয়ার করে আরও বেশি আয় করুন!</i>"""
+⚡ <i>বোনাসটি মূল একাউন্টে যুক্ত হয়েছে!</i>"""
 
-                    # সাথে সাথে টেলিগ্রামে মেসেজ পাঠানো
                     bot.send_message(
                         int(referrer_id),
                         notify_text,
@@ -163,7 +161,6 @@ def handle_referral_and_user_creation(
                 except Exception as err:
                     print(f"Referral Notification Error: {err}")
     else:
-        # পুরনো ইউজার হলে নাম ডাটাবেসে আপডেট করা
         update_user_in_db(
             user_id_str,
             {
@@ -174,18 +171,17 @@ def handle_referral_and_user_creation(
 
 
 # =================================================================
-# ⌨️ কাস্টম কিবোর্ড বাটন (Custom Reply Keyboard)
+# ⌨️ প্রিমিয়াম টেলিগ্রাম স্টাইল কাস্টম কিবোর্ড বাটন (Slim & Colorful)
 # =================================================================
 def get_main_keyboard():
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard = types.ReplyKeyboardMarkup(
+        resize_keyboard=True, one_time_keyboard=False
+    )
 
-    # সারি ১: [ কাজ | ব্যালেন্স ]
-    btn_task = types.KeyboardButton("💼 কাজ")
-    btn_balance = types.KeyboardButton("💰 ব্যালেন্স")
-
-    # সারি ২: [ রেফার | সাপোর্ট ]
-    btn_refer = types.KeyboardButton("👥 রেফার")
-    btn_support = types.KeyboardButton("🛠️ সাপোর্ট")
+    btn_task = types.KeyboardButton("💼 কাজ ⚡")
+    btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
+    btn_refer = types.KeyboardButton("👥 রেফার 🎁")
+    btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
 
     keyboard.row(btn_task, btn_balance)
     keyboard.row(btn_refer, btn_support)
@@ -208,7 +204,6 @@ def send_welcome(message):
     if len(args) > 1:
         referrer_id = args[1].strip()
 
-    # ব্যাকগ্রাউন্ডে রেফার প্রসেস ও সাথে সাথে নোটিফিকেশন পাঠানো
     threading.Thread(
         target=handle_referral_and_user_creation,
         args=(user_id, full_name, username, referrer_id),
@@ -219,28 +214,26 @@ def send_welcome(message):
     inline_kb = types.InlineKeyboardMarkup(row_width=1)
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
     btn_webapp = types.InlineKeyboardButton(
-        text="Open MH Earning Bot 📱", web_app=types.WebAppInfo(url=webapp_url)
+        text="🚀 ওপেন আর্নিং অ্যাপ 📱",
+        web_app=types.WebAppInfo(url=webapp_url),
     )
 
     share_text = f"🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ৫০ টাকা!\n\n👉 জয়েন লিংক: {referral_link}"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
     btn_share = types.InlineKeyboardButton(
-        text="রেফার শেয়ার করুন 📢", url=share_url
+        text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url
     )
 
     inline_kb.add(btn_webapp, btn_share)
 
-    welcome_text = f"""🔥 <b>MH EARNING BOT</b> 🔥
-📋 <b>এখন ঘরে বসেই ইনকাম করুন সহজে!</b>
+    welcome_text = f"""👑 <b>MH EARNING BOT</b> 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>✨ <b>ঘরে বসে সহজ উপায়ে আয় করার মাধ্যম!</b>
 
-<blockquote>✅ YouTube Subscribe Task
-✅ Telegram Join Task
-✅ Referral Income System
-✅ Daily Bonus
-✅ Instant Withdraw
-
-🏆 Trusted & Professional Telegram Earning Platform
-🎯 <b>আজই জয়েন করুন এবং ইনকাম শুরু করুন!</b> 🚀</blockquote>
+✅ <b>ভিডিও বিজ্ঞাপন দেখে ইনকাম</b>
+✅ <b>টেলিগ্রাম ও সোশ্যাল টাস্ক</b>
+✅ <b>প্রতি রেফারে ইনস্ট্যান্ট ৳ ৫০.০০</b>
+✅ <b>বিকাশ ও নগদে সরাসরি উইথড্র</b></blockquote>
 
 🔗 <b>আপনার রেফারেল লিংক:</b>
 <code>{referral_link}</code>"""
@@ -253,15 +246,26 @@ def send_welcome(message):
     )
     bot.send_message(
         message.chat.id,
-        "👇 <b>নিচের বাটনগুলো ব্যবহার করে কাজ ও ব্যালেন্স চেক করুন:</b>",
+        "👇 <b>নিচের মেন্যু থেকে অপশন সিলেক্ট করুন:</b>",
         reply_markup=get_main_keyboard(),
     )
 
 
 # =================================================================
-# ২. /কাজ এবং '💼 কাজ' বাটন হ্যান্ডলার (Auto-Ad Launch)
+# ২. কাজ বাটন হ্যান্ডলার (Auto-Ad Launch)
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["💼 কাজ", "/কাজ", "কাজ"])
+@bot.message_handler(
+    func=lambda msg: msg.text
+    in [
+        "💼 কাজ ⚡",
+        "💼 কাজ",
+        "💼 কাজ করুন",
+        "/কাজ",
+        "কাজ",
+        "/task",
+        "task",
+    ]
+)
 def task_handler(message):
     user_id = str(message.from_user.id)
 
@@ -275,22 +279,22 @@ def task_handler(message):
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_watch_video = types.InlineKeyboardButton(
-        text="🎬 সরাসরি ভিডিও অ্যাড দেখুন (৳ ১০.০০)",
+        text="🎬 ভিডিও অ্যাড দেখুন ⚡",
         web_app=types.WebAppInfo(url=auto_ad_webapp_url),
     )
     btn_social_tasks = types.InlineKeyboardButton(
-        text="📋 অন্যান্য সোশ্যাল টাস্ক ড্যাশবোর্ড",
+        text="📋 টাস্ক ড্যাশবোর্ড 🎯",
         web_app=types.WebAppInfo(url=normal_webapp_url),
     )
     task_kb.add(btn_watch_video, btn_social_tasks)
 
     msg_text = f"""💼 <b>দৈনিক ভিডিও অ্যাড ও ইনকাম টাস্ক</b>
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🎬 <b>ভিডিও বিজ্ঞাপন রিওয়ার্ড:</b>
-প্রতিটি ভিডিও সম্পূর্ণ দেখলে পাবেন <b>৳ {AD_REWARD:.2f}</b> টাকা!
+প্রতিটি ভিডিও দেখলে পাবেন <b>৳ {AD_REWARD:.2f}</b> টাকা!
 
-📊 <b>আজ সম্পন্ন করেছেন:</b> <b>{ads_watched} / 10</b> টি অ্যাড
-⚡ <b>নিয়ম:</b> নিচের <b>"সরাসরি ভিডিও অ্যাড দেখুন"</b> বাটনে চাপ দিলেই সাথে সাথে ফুল-স্ক্রিন ভিডিও চালু হবে। দেখা শেষ হলে স্বয়ংক্রিয়ভাবে ব্যালেন্সে টাকা যোগ হবে।</blockquote>
+📊 <b>আজকের দেখা অ্যাড:</b> <b>{ads_watched} / 10</b> টি
+⚡ <b>নিয়ম:</b> নিচের <b>'ভিডিও অ্যাড দেখুন'</b> বাটনে চাপ দিলেই ফুল-স্ক্রিন ভিডিও ওপেন হবে। দেখা শেষ হলে সরাসরি একাউন্টে টাকা যোগ হবে।</blockquote>
 
 👇 <i>বিজ্ঞাপন দেখতে নিচের বাটনে ট্যাপ করুন:</i>"""
 
@@ -303,10 +307,18 @@ def task_handler(message):
 
 
 # =================================================================
-# ৩. /ব্যালেন্স এবং '💰 ব্যালেন্স' বাটন হ্যান্ডলার
+# ৩. ব্যালেন্স বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(
-    func=lambda msg: msg.text in ["💰 ব্যালেন্স", "/ব্যালেন্স", "ব্যালেন্স"]
+    func=lambda msg: msg.text
+    in [
+        "💰 ব্যালেন্স 💎",
+        "💰 ব্যালেন্স",
+        "/ব্যালেন্স",
+        "ব্যালেন্স",
+        "/balance",
+        "balance",
+    ]
 )
 def balance_handler(message):
     user_id = str(message.from_user.id)
@@ -320,14 +332,15 @@ def balance_handler(message):
     tasks_done = int(user_data.get("completedTasksCount", 0))
 
     bal_kb = types.InlineKeyboardMarkup(row_width=1)
+    # স্লিম ও সুন্দর সাইজের বাটন যাতে মেসেজের বাইরে চওড়া না হয়
     btn_open_wallet = types.InlineKeyboardButton(
-        text="💳 ওয়ালেট ওপেন ও টাকা তুলুন (bKash/Nagad)",
+        text="💳 ওয়ালেট ও উইথড্র 💸",
         web_app=types.WebAppInfo(url=webapp_url),
     )
     bal_kb.add(btn_open_wallet)
 
-    msg_text = f"""👤 <b>লাইভ অ্যাকাউন্ট ব্যালেন্স ও রিপোর্ট</b>
-━━━━━━━━━━━━━━━━━━━━
+    msg_text = f"""👤 <b>লাইভ একাউন্ট ব্যালেন্স ও রিপোর্ট</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🏷️ <b>নাম:</b> {user_name}
 🆔 <b>আইডি:</b> <code>{user_id}</code>
 
@@ -336,16 +349,24 @@ def balance_handler(message):
 🎬 <b>আজকের দেখা অ্যাড:</b> <b>{ads_watched}</b> টি
 ✅ <b>টাস্ক সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
 
-📌 <i>ব্যালেন্স উইথড্র করতে নিচের বাটনে চাপুন:</i>"""
+📌 <i>টাকা তুলতে নিচের ওয়ালেট বাটনে চাপুন:</i>"""
 
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
 
 # =================================================================
-# ৪. /রেফার এবং '👥 রেফার' বাটন হ্যান্ডলার
+# ৪. রেফার বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(
-    func=lambda msg: msg.text in ["👥 রেফার", "/রেফার", "রেফার"]
+    func=lambda msg: msg.text
+    in [
+        "👥 রেফার 🎁",
+        "👥 রেফার",
+        "/রেফার",
+        "রেফার",
+        "/refer",
+        "refer",
+    ]
 )
 def refer_handler(message):
     user_id = str(message.from_user.id)
@@ -360,12 +381,12 @@ def refer_handler(message):
 
     ref_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_share = types.InlineKeyboardButton(
-        text="📢 বন্ধুদের সাথে শেয়ার করুন", url=share_url
+        text="📢 রেফার লিংক শেয়ার 🚀", url=share_url
     )
     ref_kb.add(btn_share)
 
     msg_text = f"""👥 <b>রেফারেল ইনকাম ড্যাশবোর্ড</b>
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🎁 <b>প্রতি রেফারে বোনাস:</b> <b>৳ {REFER_REWARD:.2f}</b> টাকা!
 📊 <b>মোট রেফারেল:</b> <b>{total_refs}</b> জন
 💰 <b>রেফার থেকে আয়:</b> <b>৳ {earned_from_refs:.2f}</b> টাকা</blockquote>
@@ -373,7 +394,7 @@ def refer_handler(message):
 🔗 <b>আপনার পার্সোনাল রেফার লিংক:</b>
 <code>{referral_link}</code>
 
-<i>(লিংকটিতে একবার চাপ দিলেই কপি হয়ে যাবে)</i>"""
+<i>(লিংকটিতে একবার ট্যাপ করলেই কপি হয়ে যাবে)</i>"""
 
     bot.send_message(
         message.chat.id,
@@ -384,27 +405,35 @@ def refer_handler(message):
 
 
 # =================================================================
-# ৫. /সাপোর্ট এবং '🛠️ সাপোর্ট' বাটন হ্যান্ডলার
+# ৫. সাপোর্ট বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(
-    func=lambda msg: msg.text in ["🛠️ সাপোর্ট", "/সাপোর্ট", "সাপোর্ট"]
+    func=lambda msg: msg.text
+    in [
+        "🛠️ সাপোর্ট 💬",
+        "🛠️ সাপোর্ট",
+        "/সাপোর্ট",
+        "সাপোর্ট",
+        "/support",
+        "support",
+    ]
 )
 def support_handler(message):
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_admin = types.InlineKeyboardButton(
-        text="👨‍💻 এডমিনের সাথে যোগাযোগ করুন",
+        text="👨‍💻 এডমিন সাপোর্ট 💬",
         url=f"https://t.me/{SUPPORT_USERNAME}",
     )
     sup_kb.add(btn_admin)
 
     msg_text = f"""🛠️ <b>হেল্প ও সাপোর্ট সেন্টার</b>
-━━━━━━━━━━━━━━━━━━━━
-<blockquote>বট বা পেমেন্ট সংক্রান্ত যেকোনো প্রয়োজনে সরাসরি এডমিনের সাথে কথা বলুন।
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>বট বা পেমেন্ট সংক্রান্ত যেকোনো প্রয়োজনে সরাসরি এডমিনের সাথে যোগাযোগ করুন।
 
-⏰ <b>সাপোর্ট সময়:</b> প্রতিদিন সকাল ৯:০০ টা - রাত ১১:০০ টা
+⏰ <b>সাপোর্ট সময়:</b> সকাল ৯:০০ টা - রাত ১১:০০ টা
 👤 <b>অফিসিয়াল এডমিন:</b> @{SUPPORT_USERNAME}</blockquote>
 
-👇 <i>এডমিনের ইনবক্সে যেতে নিচের বাটনে চাপুন:</i>"""
+👇 <i>এডমিনকে মেসেজ দিতে নিচের বাটনে চাপুন:</i>"""
 
     bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
 

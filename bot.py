@@ -63,7 +63,7 @@ def update_user_in_db(user_id, data):
 
 
 def get_all_tasks_from_db():
-    """ফায়ারবেজ থেকে এডমিনের সেট করা সকল টাস্ক আনা"""
+    """ফায়ারবেজ থেকে এডমিনের সকল টাস্ক লোড করা"""
     try:
         url = f"{FIREBASE_DB_URL}/tasks.json"
         res = requests.get(url, timeout=4)
@@ -186,11 +186,11 @@ def handle_referral_and_user_creation(
 # ⌨️ কাস্টম কিবোর্ড লেআউটসমূহ (Main & Sub Keyboards)
 # =================================================================
 def get_main_keyboard():
-    """মূল কিবোর্ড মেন্যু"""
+    """১. মূল কিবোর্ড মেন্যু (/কাজ থাকবে)"""
     keyboard = types.ReplyKeyboardMarkup(
         resize_keyboard=True, one_time_keyboard=False
     )
-    btn_task = types.KeyboardButton("💼 কাজ ⚡")
+    btn_task = types.KeyboardButton("/কাজ")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
     btn_refer = types.KeyboardButton("👥 রেফার 🎁")
     btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
@@ -201,12 +201,12 @@ def get_main_keyboard():
 
 
 def get_work_keyboard():
-    """কাজের সাব-কিবোর্ড মেন্যু"""
+    """২. /কাজ এ চাপ দিলে এই নতুন কিবোর্ডটি ওপেন হবে"""
     keyboard = types.ReplyKeyboardMarkup(
         resize_keyboard=True, one_time_keyboard=False
     )
-    btn_video = types.KeyboardButton("🎬 ভিডিও অ্যাড দেখুন ⚡")
-    btn_tasks = types.KeyboardButton("📋 টাস্ক ড্যাশবোর্ড 🎯")
+    btn_video = types.KeyboardButton("/ভিডিও এড দেখুন")
+    btn_tasks = types.KeyboardButton("/ট্যাক্স সম্পূর্ণ করুন")
     btn_back = types.KeyboardButton("🔙 মূল মেন্যু")
 
     keyboard.row(btn_video, btn_tasks)
@@ -257,7 +257,7 @@ def send_welcome(message):
 <blockquote>✨ <b>ঘরে বসে সহজ উপায়ে আয় করার প্রিমিয়াম প্ল্যাটফর্ম!</b>
 
 ✅ <b>ভিডিও বিজ্ঞাপন দেখে ইনকাম</b>
-✅ <b>টেলিগ্রাম ও সোশ্যাল টাস্ক কমপ্লিট</b>
+✅ <b>সোশ্যাল ট্যাক্স সম্পূর্ণ করে আয়</b>
 ✅ <b>প্রতি রেফারে ইনস্ট্যান্ট ৳ ৫০.০০</b>
 ✅ <b>বিকাশ ও নগদে সরাসরি উইথড্র</b></blockquote>
 
@@ -272,28 +272,36 @@ def send_welcome(message):
     )
     bot.send_message(
         message.chat.id,
-        "👇 <b>নিচের মেন্যু থেকে আপনার কাঙ্ক্ষিত অপশন বেছে নিন:</b>",
+        "👇 <b>নিচের মেন্যু থেকে অপশন সিলেক্ট করুন:</b>",
         reply_markup=get_main_keyboard(),
     )
 
 
 # =================================================================
-# ২. কাজ বাটন হ্যান্ডলার (ক্লিক করলে নতুন ২টি বাটন ওপেন হবে)
+# ২. /কাজ বাটন হ্যান্ডলার (নিচে কোন কিছু থাকবে না, শুধু টেক্সট + কিবোর্ড চেঞ্জ)
 # =================================================================
 @bot.message_handler(
     func=lambda msg: msg.text
-    in ["💼 কাজ ⚡", "💼 কাজ", "কাজ", "/কাজ", "/task", "task"]
+    in [
+        "/কাজ",
+        "কাজ",
+        "/task",
+        "task",
+        "💼 কাজ ⚡",
+        "💼 কাজ",
+    ]
 )
 def work_options_handler(message):
-    reply_text = """💼 <b>কাজের ক্যাটাগরি সিলেক্ট করুন</b>
+    reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ আপনি দুইভাবে কাজ করে প্রতিদিন আনলিমিটেড ইনকাম করতে পারবেন:
+<blockquote>⚡ আপনি দুইভাবে কাজ করে আনলিমিটেড টাকা ইনকাম করতে পারবেন:
 
-1️⃣ <b>ভিডিও অ্যাড দেখুন:</b> ছোট ছোট বিজ্ঞাপন দেখে প্রতিটিতে রিওয়ার্ড পান।
-2️⃣ <b>টাস্ক ড্যাশবোর্ড:</b> সোশ্যাল চ্যানেল জয়েন এবং টাস্ক পূরণ করে বড় অংকের বোনাস পান।</blockquote>
+🎬 <b>/ভিডিও এড দেখুন:</b> প্রতিদিন আনলিমিটেড বিজ্ঞাপন দেখে রিওয়ার্ড আয় করুন।
+📋 <b>/ট্যাক্স সম্পূর্ণ করুন:</b> বিভিন্ন সোশ্যাল চ্যানেলে জয়েন করে বড় অংকের টাকা আয় করুন।</blockquote>
 
-👇 <i>নিচের কিবোর্ড থেকে অপশন সিলেক্ট করুন:</i>"""
+👇 <i>নিচের কিবোর্ড বাটন থেকে যেকোনো একটি বেছে নিন:</i>"""
 
+    # এখানে মেসেজের নিচে কোনো ইনলাইন বাটন থাকবে না, সরাসরি কিবোর্ড পরিবর্তিত হবে
     bot.send_message(
         message.chat.id,
         reply_text,
@@ -302,16 +310,16 @@ def work_options_handler(message):
 
 
 # =================================================================
-# ৩. ভিডিও অ্যাড দেখুন হ্যান্ডলার (প্রিমিয়াম টেক্সট + ওপেন বাটন)
+# ৩. /ভিডিও এড দেখুন হ্যান্ডলার (প্রিমিয়াম টেক্সট + নিচে 'ওপেন' ইনলাইন বাটন)
 # =================================================================
 @bot.message_handler(
     func=lambda msg: msg.text
     in [
-        "🎬 ভিডিও অ্যাড দেখুন ⚡",
-        "ভিডিও অ্যাড দেখুন",
-        "ভিডিও এড দেখুন",
         "/ভিডিও এড দেখুন",
         "/ভিডিও অ্যাড দেখুন",
+        "ভিডিও এড দেখুন",
+        "ভিডিও অ্যাড দেখুন",
+        "🎬 ভিডিও অ্যাড দেখুন ⚡",
     ]
 )
 def video_ad_handler(message):
@@ -319,7 +327,7 @@ def video_ad_handler(message):
     user_data = get_user_from_db(user_id) or {}
     ads_watched = int(user_data.get("adsWatched", 0))
 
-    # সরাসরি অ্যাড অটো-রান করার জন্য মিনি অ্যাপের স্পেশাল লিংক
+    # মিনি অ্যাপে সরাসরি ফুল স্ক্রিন অ্যাড লোড করার লিংক
     auto_ad_webapp_url = (
         f"{MINI_APP_URL}#action=watch_ad&tgWebAppStartParam={user_id}"
     )
@@ -331,17 +339,17 @@ def video_ad_handler(message):
     )
     ad_kb.add(btn_open_ad)
 
-    msg_text = f"""🎬 <b>প্রিমিয়াম ভিডিও অ্যাড জোন</b>
+    msg_text = f"""🎬 <b>প্রিমিয়াম ভিডিও বিজ্ঞাপন জোন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>💎 <b>বিজ্ঞাপন রিওয়ার্ড:</b> <b>৳ {AD_REWARD:.2f} টাকা</b> প্রতি ভিউ!
-📊 <b>আজকের সম্পন্ন অ্যাড:</b> <b>{ads_watched} / 10</b> টি
+📊 <b>আজকের দেখা অ্যাড:</b> <b>{ads_watched} / 10</b> টি
 
 ⚡ <b>নিয়মাবলী:</b>
-• নিচের <b>'ওপেন (ভিডিও অ্যাড দেখুন)'</b> বাটনে ট্যাপ করুন।
-• মিনি অ্যাপে ফুল-স্ক্রিন ভিডিও প্লে হবে।
-• সম্পূর্ণ বিজ্ঞাপন দেখার পর সরাসরি আপনার মেইন ওয়ালেটে টাকা যুক্ত হবে।</blockquote>
+১. নিচের <b>'ওপেন'</b> বাটনে ক্লিক করলে ফুল-স্ক্রিন ভিডিও ওপেন হবে।
+২. ভিডিওটি সম্পূর্ণ শেষ হওয়া পর্যন্ত অপেক্ষা করুন।
+৩. দেখা শেষ হলে সাথে সাথে ওয়ালেটে টাকা যুক্ত হয়ে যাবে।</blockquote>
 
-👇 <i>ভিডিও শুরু করতে নিচের বাটনে চাপ দিন:</i>"""
+👇 <i>ভিডিও অ্যাড চালু করতে নিচের ওপেন বাটনে চাপুন:</i>"""
 
     bot.send_message(
         message.chat.id,
@@ -352,16 +360,17 @@ def video_ad_handler(message):
 
 
 # =================================================================
-# ৪. টাস্ক ড্যাশবোর্ড ও লাইভ ভেরিফিকেশন সিস্টেম
+# ৪. /ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (ফায়ারবেজ থেকে লাইভ টাস্ক লোড)
 # =================================================================
 @bot.message_handler(
     func=lambda msg: msg.text
     in [
-        "📋 টাস্ক ড্যাশবোর্ড 🎯",
-        "টাস্ক ড্যাশবোর্ড",
-        "/টাস্ক ড্যাশবোর্ড",
+        "/ট্যাক্স সম্পূর্ণ করুন",
+        "/টাস্ক সম্পূর্ণ করুন",
+        "ট্যাক্স সম্পূর্ণ করুন",
+        "টাস্ক সম্পূর্ণ করুন",
         "/tasks",
-        "টাস্ক",
+        "📋 টাস্ক ড্যাশবোর্ড 🎯",
     ]
 )
 def task_dashboard_handler(message):
@@ -372,7 +381,6 @@ def task_dashboard_handler(message):
     all_tasks = get_all_tasks_from_db()
 
     if not all_tasks:
-        # যদি কোন টাস্ক না থাকে, নরমাল মিনি অ্যাপ ড্যাশবোর্ড ওপেন করবে
         normal_webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
         no_task_kb = types.InlineKeyboardMarkup()
         no_task_kb.add(
@@ -384,32 +392,31 @@ def task_dashboard_handler(message):
 
         bot.send_message(
             message.chat.id,
-            """📋 <b>সোশ্যাল টাস্ক ড্যাশবোর্ড</b>
+            """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>বর্তমানে সরাসরি বটে কোনো নতুন টাস্ক নেই অথবা সব টাস্ক সম্পন্ন হয়েছে। অ্যাপ থেকে নতুন টাস্ক চেক করুন!</blockquote>""",
+<blockquote>বর্তমানে বটে কোনো নতুন ট্যাক্স নেই। অ্যাপ থেকে নতুন ট্যাক্স চেক করুন!</blockquote>""",
             reply_markup=no_task_kb,
         )
         return
 
-    # টাস্কগুলোর তালিকা তৈরি
-    msg_text = """📋 <b>সোশ্যাল আর্নিং টাস্ক ড্যাশবোর্ড</b>
+    msg_text = """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ <b>কাজের নিয়ম:</b>
-১. নিচের টাস্ক লিংকগুলোতে ক্লিক করে চ্যানেল/গ্রুপে জয়েন করুন।
-২. জয়েন শেষ হলে নিচের <b>'✅ ভেরিফাই'</b> বাটনে ক্লিক করুন।
-৩. সাথে সাথে টাকা আপনার একাউন্টে যুক্ত হবে!</blockquote>\n"""
+<blockquote>⚡ <b>কাজের নিয়মাবলী:</b>
+১. নিচের লিংকগুলোতে ক্লিক করে গ্রুপ/চ্যানেলে জয়েন করুন।
+২. জয়েন সম্পন্ন হলে নিচের <b>'✅ ভেরিফাই করুন'</b> বাটনে ট্যাপ করুন।
+৩. ভেরিফাই হওয়ামাত্রই টাকা সরাসরি মিনি অ্যাপ ওয়ালেটে যুক্ত হবে!</blockquote>\n"""
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
 
     pending_tasks_count = 0
     for task_id, task in all_tasks.items():
         if isinstance(task, dict):
-            # যদি ইতিমধ্যে কমপ্লিট হয়ে থাকে তাহলে স্কিপ করবে
+            # অলরেডি কমপ্লিট করা থাকলে দেখাবে না
             if task_id in completed_tasks:
                 continue
 
             pending_tasks_count += 1
-            title = task.get("title", f"টাস্ক #{task_id}")
+            title = task.get("title", f"ট্যাক্স #{task_id}")
             reward = float(task.get("reward", 5.00))
             link = task.get("url", task.get("link", "https://t.me"))
 
@@ -426,7 +433,7 @@ def task_dashboard_handler(message):
     if pending_tasks_count == 0:
         bot.send_message(
             message.chat.id,
-            "🎉 <b>অভিনন্দন! আপনি আজকের সব টাস্ক সম্পন্ন করে ফেলেছেন!</b>\nনতুন টাস্ক আসলে এখানে দেখতে পাবেন।",
+            "🎉 <b>অভিনন্দন! আপনি সব ট্যাক্স সম্পূর্ণ করে ফেলেছেন!</b>\nনতুন ট্যাক্স অ্যাড হলে এখানে দেখতে পাবেন।",
             reply_markup=get_main_keyboard(),
         )
     else:
@@ -439,7 +446,7 @@ def task_dashboard_handler(message):
 
 
 # =================================================================
-# ৫. টাস্ক ইনস্ট্যান্ট ভেরিফাই Callback Query
+# ৫. ট্যাক্স ভেরিফাই Callback Query (টাকা ওয়ালেটে অ্যাড হওয়া)
 # =================================================================
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
 def verify_task_callback(call):
@@ -452,32 +459,30 @@ def verify_task_callback(call):
     if task_id in completed_tasks:
         bot.answer_callback_query(
             call.id,
-            "⚠️ আপনি এই টাস্কটি আগেই সম্পন্ন করেছেন!",
+            "⚠️ আপনি এই ট্যাক্সটি আগেই সম্পূর্ণ করেছেন!",
             show_alert=True,
         )
         return
 
-    # ফায়ারবেজ থেকে টাস্কের তথ্য আনা
     tasks = get_all_tasks_from_db()
     task = tasks.get(task_id)
 
     if not task:
         bot.answer_callback_query(
-            call.id, "❌ টাস্কটি আর সক্রিয় নেই!", show_alert=True
+            call.id, "❌ ট্যাক্সটি আর সক্রিয় নেই!", show_alert=True
         )
         return
 
     task_reward = float(task.get("reward", 5.00))
-    task_title = task.get("title", "টাস্ক")
+    task_title = task.get("title", "ট্যাক্স")
 
-    # ইউজারের ব্যালেন্স এবং সম্পন্ন টাস্ক আপডেট
     cur_bal = float(user_data.get("balance", 0.0))
     cur_tasks_count = int(user_data.get("completedTasksCount", 0))
 
     new_balance = cur_bal + task_reward
     new_tasks_count = cur_tasks_count + 1
 
-    # Firebase এ ডাটা সেভ
+    # Firebase এ ওয়ালেট আপডেট
     update_user_in_db(
         user_id,
         {
@@ -489,23 +494,23 @@ def verify_task_callback(call):
 
     bot.answer_callback_query(
         call.id,
-        f"🎉 অভিনন্দন! টাস্ক সফলভাবে ভেরিফাই হয়েছে। +৳ {task_reward:.2f} যোগ হয়েছে!",
+        f"🎉 অভিনন্দন! ট্যাক্স ভেরিফাই হয়েছে। +৳ {task_reward:.2f} ওয়ালেটে যোগ হয়েছে!",
         show_alert=True,
     )
 
-    success_text = f"""✅ <b>টাস্ক সম্পন্ন ও রিওয়ার্ড যুক্ত!</b>
+    success_text = f"""✅ <b>ট্যাক্স সম্পূর্ণ ও রিওয়ার্ড যুক্ত!</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>🎯 <b>টাস্ক:</b> {task_title}
+<blockquote>🎯 <b>ট্যাক্স:</b> {task_title}
 💰 <b>যোগ হয়েছে:</b> <b>+ ৳ {task_reward:.2f} টাকা</b>
 💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
 
-⚡ <i>ব্যালেন্স আপনার ওয়ালেটে ইনস্ট্যান্ট আপডেট হয়েছে!</i>"""
+⚡ <i>টাকাটি সরাসরি আপনার মিনি অ্যাপ ব্যালেন্সে যুক্ত হয়েছে!</i>"""
 
     bot.send_message(call.message.chat.id, success_text)
 
 
 # =================================================================
-# ৬. মূল মেন্যুতে ফিরে আসার বাটন
+# ৬. মূল মেন্যুতে ফিরে আসা
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🔙 মূল মেন্যু", "মূল মেন্যু"])
 def back_to_main_menu(message):
@@ -556,7 +561,7 @@ def balance_handler(message):
 💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {balance:.2f}</b> টাকা
 👥 <b>মোট সফল রেফার:</b> <b>{referrals}</b> জন
 🎬 <b>আজকের দেখা অ্যাড:</b> <b>{ads_watched}</b> টি
-✅ <b>টাস্ক সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
+✅ <b>ট্যাক্স সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
 
 📌 <i>টাকা তুলতে নিচের ওয়ালেট বাটনে চাপুন:</i>"""
 
@@ -583,9 +588,4 @@ def refer_handler(message):
 
     ref_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_share = types.InlineKeyboardButton(
-        text="📢 রেফার লিংক শেয়ার 🚀", url=share_url
-    )
-    ref_kb.add(btn_share)
-
-    msg_text = f"""👥 <b>রেফারেল ইনকাম ড্যাশবোর্ড</b>
-━━━━━━━━
+        text="📢 রেফার লিংক শেয়ার 🚀", url=share_

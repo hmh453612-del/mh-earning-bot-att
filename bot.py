@@ -29,7 +29,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "MH Earning Bot Engine Running 24/7!"
+    return "MH Earning Bot Premium Engine is Running 24/7!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
@@ -56,6 +56,7 @@ def update_user_in_db(user_id, data):
         print(f"Firebase Update Error: {e}")
 
 def get_all_tasks_from_db():
+    """ফায়ারবেজ থেকে এডমিনের সকল টাস্ক লোড করা"""
     try:
         url = f"{FIREBASE_DB_URL}/tasks.json"
         res = requests.get(url, timeout=4)
@@ -66,6 +67,7 @@ def get_all_tasks_from_db():
     return {}
 
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
+    """নতুন ইউজার তৈরি ও সাথে সাথে রেফারকারীকে নোটিফিকেশন পাঠানো"""
     user_id_str = str(user_id)
     user_data = get_user_from_db(user_id_str)
     now = datetime.now()
@@ -145,10 +147,10 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
         })
 
 # =================================================================
-# ⌨️ কিবোর্ড লেআউটসমূহ (Main & Sub Keyboards)
+# ⌨️ প্রিমিয়াম কিবোর্ড লেআউটসমূহ (Main & Sub Menus)
 # =================================================================
 def get_main_keyboard():
-    """হোম মেন্যু কিবোর্ড"""
+    """১. মূল হোম মেন্যু কিবোর্ড"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -160,7 +162,7 @@ def get_main_keyboard():
     return keyboard
 
 def get_work_keyboard():
-    """কাজের সাব-মেন্যু কিবোর্ড (ক্লিক করলে এই বাটনগুলো ওপেন হবে)"""
+    """২. /কাজ এ চাপ দিলে এই সাব-মেন্যু কিবোর্ড ওপেন হবে"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_video = types.KeyboardButton("/ভিডিও এড দেখুন")
     btn_tasks = types.KeyboardButton("/ট্যাক্স সম্পূর্ণ করুন")
@@ -171,7 +173,7 @@ def get_work_keyboard():
     return keyboard
 
 # =================================================================
-# ১. /start কমান্ড
+# ১. /start কমান্ড হ্যান্ডলার
 # =================================================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -216,9 +218,9 @@ def send_welcome(message):
     bot.send_message(message.chat.id, "👇 <b>নিচের মেন্যু থেকে অপশন সিলেক্ট করুন:</b>", reply_markup=get_main_keyboard())
 
 # =================================================================
-# ২. কাজ বাটন হ্যান্ডলার (মেসেজের নিচে কোনো বাটন থাকবে না, শুধু কিবোর্ড বদলাবে)
+# ২. /কাজ বাটন হ্যান্ডলার (নিচে কোনো ইনলাইন বাটন থাকবে না, কিবোর্ড বদলে যাবে)
 # =================================================================
-@bot.message_handler(commands=['কাজ', 'work', 'task'], func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["কাজ", "/কাজ", "task", "work"]))
+@bot.message_handler(commands=['কাজ', 'work', 'task'], func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["কাজ", "/কাজ", "task", "work", "💼 কাজ ⚡", "💼 কাজ"]))
 def work_options_handler(message):
     reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -234,7 +236,7 @@ def work_options_handler(message):
 # =================================================================
 # ৩. /ভিডিও এড দেখুন হ্যান্ডলার (টেক্সট মেসেজ + নিচে 'ওপেন' ইনলাইন বাটন)
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ভিডিও এড দেখুন", "ভিডিও অ্যাড দেখুন", "/ভিডিও এড দেখুন", "/ভিডিও অ্যাড দেখুন"]))
+@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ভিডিও এড দেখুন", "ভিডিও অ্যাড দেখুন", "/ভিডিও এড দেখুন", "/ভিডিও অ্যাড দেখুন", "ভিডিও এড", "ভিডিও"]))
 def video_ad_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -261,7 +263,7 @@ def video_ad_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৪. /ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (ফায়ারবেজ থেকে টাস্ক লোড)
+# ৪. /ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (ফায়ারবেজ থেকে লাইভ টাস্ক লোড)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ট্যাক্স সম্পূর্ণ করুন", "টাস্ক সম্পূর্ণ করুন", "/ট্যাক্স সম্পূর্ণ করুন", "/টাস্ক সম্পূর্ণ করুন", "ট্যাক্স", "টাস্ক"]))
 def task_dashboard_handler(message):
@@ -316,7 +318,7 @@ def task_dashboard_handler(message):
         bot.send_message(message.chat.id, msg_text, reply_markup=task_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৫. ট্যাক্স ভেরিফাই Callback Query
+# ৫. ট্যাক্স ভেরিফাই Callback Query (টাকা ওয়ালেটে জমা হওয়া)
 # =================================================================
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
 def verify_task_callback(call):
@@ -367,14 +369,14 @@ def verify_task_callback(call):
 # =================================================================
 # ৬. ব্যাক বাটন হ্যান্ডলার (মূল মেন্যুতে ফিরে যাওয়া)
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ব্যাক", "back", "/back", "মূল মেন্যু"]))
+@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ব্যাক", "back", "/back", "মূল মেন্যু", "🔙 ব্যাক"]))
 def back_to_main_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard())
 
 # =================================================================
-# ৭. ব্যালেন্স বাটন
+# ৭. /ব্যালেন্স বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ব্যালেন্স", "balance", "/balance"]))
+@bot.message_handler(commands=['balance', 'ব্যালেন্স'], func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["ব্যালেন্স", "balance", "/balance", "/ব্যালেন্স", "💰 ব্যালেন্স 💎", "💰 ব্যালেন্স"]))
 def balance_handler(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name or "User"
@@ -405,9 +407,9 @@ def balance_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
 # =================================================================
-# ৮. রেফার বাটন
+# ৮. /রেফার বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["রেফার", "refer", "/refer"]))
+@bot.message_handler(commands=['refer', 'রেফার'], func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["রেফার", "refer", "/refer", "/রেফার", "👥 রেফার 🎁", "👥 রেফার"]))
 def refer_handler(message):
     user_id = str(message.from_user.id)
     referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
@@ -437,9 +439,9 @@ def refer_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৯. সাপোর্ট বাটন
+# ৯. /সাপোর্ট বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["সাপোর্ট", "support", "/support"]))
+@bot.message_handler(commands=['support', 'সাপোর্ট'], func=lambda msg: msg.text and any(x in msg.text.strip().lower() for x in ["সাপোর্ট", "support", "/support", "/সাপোর্ট", "🛠️ সাপোর্ট 💬", "🛠️ সাপোর্ট"]))
 def support_handler(message):
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_admin = types.InlineKeyboardButton(text="👨‍💻 এডমিন সাপোর্ট 💬", url=f"https://t.me/{SUPPORT_USERNAME}")
@@ -457,7 +459,7 @@ def support_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
 
 # =================================================================
-# 🚀 মেইন রানার
+# 🚀 মেইন রানার (Keep-Alive + Polling Engine)
 # =================================================================
 if __name__ == "__main__":
     print("🌐 Keep-Alive Server চালু হচ্ছে...")

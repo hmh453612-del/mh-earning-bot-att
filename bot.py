@@ -31,15 +31,18 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "👑 MH Earning Bot Ultra Master Engine (With Withdrawal & Sync) is Running 24/7!"
+    return "👑 MH Earning Bot Ultra Master Engine is Running 24/7!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
 # =================================================================
-# 🔥 Firebase Helper Engine & System Settings
+# 🔥 Firebase Engine & System Settings
 # =================================================================
+def is_admin(user_id):
+    return str(user_id) == str(ADMIN_ID)
+
 def get_system_settings():
     default_settings = {
         "ad_reward": 10.00,
@@ -119,24 +122,24 @@ def delete_task_from_db(task_id):
         print(f"Firebase Delete Task Error: {e}")
         return False
 
-# উইথড্র ডাটাবেজ হ্যান্ডলার
 def get_all_withdrawals_from_db():
+    """মিনি অ্যাপের transactions ডাটাবেজ থেকে রিকোয়েস্ট পড়া"""
     try:
-        url = f"{FIREBASE_DB_URL}/withdrawals.json"
+        url = f"{FIREBASE_DB_URL}/transactions.json"
         res = requests.get(url, timeout=6)
         if res.status_code == 200 and res.json():
             return res.json()
     except Exception as e:
-        print(f"Firebase Withdrawals Fetch Error: {e}")
+        print(f"Firebase Transactions Fetch Error: {e}")
     return {}
 
-def update_withdrawal_in_db(w_id, data):
+def update_withdrawal_in_db(tx_id, data):
     try:
-        url = f"{FIREBASE_DB_URL}/withdrawals/{w_id}.json"
+        url = f"{FIREBASE_DB_URL}/transactions/{tx_id}.json"
         requests.patch(url, json=data, timeout=5)
         return True
     except Exception as e:
-        print(f"Firebase Withdrawal Update Error: {e}")
+        print(f"Firebase Transaction Update Error: {e}")
         return False
 
 def extract_telegram_username(url):
@@ -168,7 +171,7 @@ def verify_telegram_membership(channel_username, user_id):
 # 🛡️ সিকিউরিটি ও রক্ষণাবেক্ষণ ফিল্টার
 # =================================================================
 def check_user_access(user_id):
-    if user_id == ADMIN_ID:
+    if is_admin(user_id):
         return True, ""
     
     settings = get_system_settings()
@@ -182,7 +185,7 @@ def check_user_access(user_id):
     return True, ""
 
 # =================================================================
-# 👥 রেফারেল ও ইউজার মেম্বারশিপ (১০০% সিঙ্ক সহ)
+# 👥 রেফারেল ও মেম্বারশিপ ইঞ্জিন (মিনি অ্যাপের সাথে ১০০% সিঙ্ক)
 # =================================================================
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
     user_id_str = str(user_id)
@@ -199,6 +202,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
             "name": full_name,
             "username": f"@{username}" if username else "N/A",
             "balance": 0.00,
+            "withdrawn": 0.00,
             "totalEarned": 0.00,
             "lifetimeEarnings": 0.00,
             "lifetimeBalance": 0.00,
@@ -278,7 +282,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
         })
 
 # =================================================================
-# ⌨️ কিবোর্ড লেআউটসমূহ
+# ⌨️ ইউজার মেন্যু কিবোর্ডসমূহ
 # =================================================================
 def get_main_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
@@ -302,25 +306,25 @@ def get_work_keyboard():
     return keyboard
 
 # =================================================================
-# 👑 আল্ট্রা অ্যাডমিন ড্যাশবোর্ড কিবোর্ড
+# 👑 আল্ট্রা প্রফেশনাল অ্যাডমিন প্যানেল ইঞ্জিন
 # =================================================================
 def get_admin_dashboard_markup():
     settings = get_system_settings()
     m_status = "🔴 বন্ধ করুন" if settings.get("maintenance_mode", False) else "🟢 চালু করুন"
     
-    # পেন্ডিং উইথড্র সংখ্যা গুনে নেওয়া
+    # পেন্ডিং উইথড্র গণনা
     all_wd = get_all_withdrawals_from_db()
     pending_count = 0
     if all_wd:
         for item in all_wd.values():
-            if isinstance(item, dict) and item.get("status") == "pending":
+            if isinstance(item, dict) and item.get("status", "Pending").lower() == "pending":
                 pending_count += 1
 
     wd_badge = f" ({pending_count} টি)" if pending_count > 0 else " (০)"
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("📊 লাইভ অ্যানালিটিক্স ও সামারি", callback_data="adm_stats"),
+        types.InlineKeyboardButton("📊 লাইভ অ্যানালিটিক্স ও ডাটাবেজ সামারি", callback_data="adm_stats"),
         types.InlineKeyboardButton(f"💸 পেন্ডিং উইথড্র রিকোয়েস্ট{wd_badge}", callback_data="adm_withdrawals"),
         types.InlineKeyboardButton("📢 অল ইউজার স্মার্ট ব্রডকাস্ট", callback_data="adm_broadcast"),
         types.InlineKeyboardButton("➕ নতুন সোশ্যাল ট্যাক্স তৈরি করুন", callback_data="adm_add_task"),
@@ -333,23 +337,14 @@ def get_admin_dashboard_markup():
     )
     return markup
 
-@bot.message_handler(commands=['admin'])
-def admin_command(message):
-    if message.from_user.id != ADMIN_ID:
-        unauth_msg = f"""🚫 <b>অ্যাক্সেস ডিনাইড (Access Denied)!</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚠️ এই কমান্ডটি শুধুমাত্র সিস্টেম অ্যাডমিনিস্ট্রেটরের জন্য সংরক্ষিত।</blockquote>
-
-👉 বটের অন্যান্য সুবিধা পেতে মেন্যু বাটন চাপুন বা /start লিখুন।"""
-        bot.send_message(message.chat.id, unauth_msg, reply_markup=get_main_keyboard())
-        return
-
+def show_admin_dashboard(chat_id, message_id=None):
+    """কোনো বাধা ছাড়া নির্ভরযোগ্যভাবে অ্যাডমিন প্যানেল ওপেন করার ইঞ্জিন"""
     settings = get_system_settings()
     m_state = "সক্রিয় 🔴" if settings.get("maintenance_mode", False) else "স্বাভাবিক 🟢"
 
     admin_panel_text = f"""👑 <b>MH EARNING ULTRA MASTER ADMIN PANEL</b> 👑
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>স্বাগতম অ্যাডমিন! সিস্টেম পুরোপুরি লাইভ ও প্রস্তুত।
+<blockquote>স্বাগতম অ্যাডমিন! সিস্টেম পুরোপুরি লাইভ ও আপনার নিয়ন্ত্রণে রয়েছে।
 
 👤 <b>অ্যাডমিন আইডি:</b> <code>{ADMIN_ID}</code>
 🟢 <b>সার্ভার স্ট্যাটাস:</b> অনলাইন (Active 24/7)
@@ -357,15 +352,35 @@ def admin_command(message):
 🎬 <b>ভিডিও এড রিওয়ার্ড:</b> ৳ {settings.get('ad_reward', 10.0):.2f} টাকা
 🎁 <b>রেফার বোনাস:</b> ৳ {settings.get('refer_reward', 50.0):.2f} টাকা</blockquote>
 
-👇 <i>প্রয়োজনীয় কাজ সম্পন্ন করতে নিচের অপশন বেছে নিন:</i>"""
-    bot.send_message(message.chat.id, admin_panel_text, reply_markup=get_admin_dashboard_markup())
+👇 <i>যেকোনো অপশন পরিবর্তন বা পরিচালনা করতে নিচের বাটন বেছে নিন:</i>"""
+
+    if message_id:
+        try:
+            bot.edit_message_text(admin_panel_text, chat_id, message_id, reply_markup=get_admin_dashboard_markup())
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, admin_panel_text, reply_markup=get_admin_dashboard_markup())
+
+@bot.message_handler(commands=['admin'])
+def admin_command(message):
+    if not is_admin(message.from_user.id):
+        unauth_msg = f"""🚫 <b>অ্যাক্সেস ডিনাইড (Access Denied)!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚠️ এই কমান্ডটি শুধুমাত্র সিস্টেম অ্যাডমিনিস্ট্রেটরের জন্য সংরক্ষিত।</blockquote>
+
+👉 বটের অন্যান্য সুবিধা পেতে নিচের মেন্যু ব্যবহার করুন বা /start লিখুন।"""
+        bot.send_message(message.chat.id, unauth_msg, reply_markup=get_main_keyboard())
+        return
+
+    show_admin_dashboard(message.chat.id)
 
 # =================================================================
 # ⚙️ অ্যাডমিন ডিসপ্যাচার ও উইথড্রল প্রসেসিং ইঞ্জিন
 # =================================================================
 @bot.callback_query_handler(func=lambda call: call.data.startswith("adm_"))
 def admin_callbacks(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         bot.answer_callback_query(call.id, "🚫 আপনার অনুমতি নেই!", show_alert=True)
         return
 
@@ -390,9 +405,10 @@ def admin_callbacks(call):
         if all_wd:
             for w in all_wd.values():
                 if isinstance(w, dict):
-                    if w.get("status") == "pending":
+                    st = str(w.get("status", "")).lower()
+                    if st == "pending":
                         pending_wd += 1
-                    elif w.get("status") == "approved":
+                    elif st in ["approved", "paid"]:
                         paid_wd_amount += float(w.get("amount", 0.0))
 
         stats_text = f"""📊 <b>লাইভ ডাটাবেজ অ্যানালিটিক্স</b>
@@ -419,7 +435,7 @@ def admin_callbacks(call):
 
         if all_wd:
             for w_id, w_data in all_wd.items():
-                if isinstance(w_data, dict) and w_data.get("status", "pending") == "pending":
+                if isinstance(w_data, dict) and str(w_data.get("status", "pending")).lower() == "pending":
                     pending_list.append((w_id, w_data))
 
         if not pending_list:
@@ -428,7 +444,6 @@ def admin_callbacks(call):
             bot.edit_message_text("🎉 <b>বর্তমানে কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই!</b>\nসকল পেমেন্ট ক্লিয়ার আছে।", call.message.chat.id, call.message.message_id, reply_markup=back_kb)
             return
 
-        # ১ম পেন্ডিং রিকোয়েস্টটি ডিসপ্লে করা
         w_id, w_data = pending_list[0]
         display_single_withdrawal(call.message.chat.id, call.message.message_id, w_id, w_data, len(pending_list))
 
@@ -484,7 +499,7 @@ def admin_callbacks(call):
         bot.answer_callback_query(call.id)
         msg = bot.send_message(
             call.message.chat.id,
-            "🎁 <b>অল ইউজার স্পেশাল বোনাস বিতরণ</b>\n\nসকল ইউজারের ওয়ালেটে একযোগে কত টাকা পাঠাতে চান? টাকার পরিমাণ লিখুন (যেমন: 10 বা 20):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>"
+            "🎁 <b>অল ইউজার স্পেশাল বোনাস বিতরণ</b>\n\nসকল ইউজারের ওয়ালেটে একযোগে কত টাকা পাঠাতে চান? টাকার পরিমাণ লিখুন (যেমন: 5 বা 10):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>"
         )
         bot.register_next_step_handler(msg, process_mass_bonus)
 
@@ -508,12 +523,12 @@ def admin_callbacks(call):
         
         status_text = "চালু করা হয়েছে (Active) 🔴" if new_state else "বন্ধ করা হয়েছে (Online) 🟢"
         bot.answer_callback_query(call.id, f"রক্ষণাবেক্ষণ মোড {status_text}", show_alert=True)
-        admin_command(call.message)
+        show_admin_dashboard(call.message.chat.id, call.message.message_id)
 
     # ১০. ব্যাক মেন্যু
     elif action == "adm_back_menu":
         bot.answer_callback_query(call.id)
-        admin_command(call.message)
+        show_admin_dashboard(call.message.chat.id, call.message.message_id)
 
     # ১১. প্যানেল বন্ধ
     elif action == "adm_close":
@@ -527,7 +542,7 @@ def display_single_withdrawal(chat_id, message_id, w_id, w_data, total_pending):
     user_id = str(w_data.get("userId", "N/A"))
     user_name = w_data.get("userName", "N/A")
     method = w_data.get("method", "বিকাশ/নগদ")
-    number = w_data.get("number", "N/A")
+    number = w_data.get("number", w_data.get("account", "N/A"))
     amount = float(w_data.get("amount", 0.0))
     time_str = w_data.get("date", datetime.now().strftime("%I:%M %p | %d/%m/%Y"))
 
@@ -544,8 +559,8 @@ def display_single_withdrawal(chat_id, message_id, w_id, w_data, total_pending):
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton(f"✅ পেমেন্ট সম্পন্ন হয়েছে (Approve)", callback_data=f"wdapp_{w_id}"),
-        types.InlineKeyboardButton(f"❌ বাতিল ও টাকা রিফান্ড দিন (Reject)", callback_data=f"wdrej_{w_id}"),
+        types.InlineKeyboardButton("✅ পেমেন্ট সম্পন্ন হয়েছে (Approve)", callback_data=f"wdapp_{w_id}"),
+        types.InlineKeyboardButton("❌ বাতিল ও টাকা রিফান্ড দিন (Reject)", callback_data=f"wdrej_{w_id}"),
         types.InlineKeyboardButton("🔙 অ্যাডমিন মেন্যু", callback_data="adm_back_menu")
     )
 
@@ -553,7 +568,7 @@ def display_single_withdrawal(chat_id, message_id, w_id, w_data, total_pending):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("wdapp_"))
 def approve_withdrawal(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         return
     w_id = call.data.replace("wdapp_", "")
     all_wd = get_all_withdrawals_from_db()
@@ -563,14 +578,13 @@ def approve_withdrawal(call):
         bot.answer_callback_query(call.id, "❌ উইথড্র রেকর্ড পাওয়া যায়নি!", show_alert=True)
         return
 
-    update_withdrawal_in_db(w_id, {"status": "approved", "processedAt": int(time.time() * 1000)})
+    update_withdrawal_in_db(w_id, {"status": "Approved", "processedAt": int(time.time() * 1000)})
     bot.answer_callback_query(call.id, "✅ পেমেন্ট সফলভাবে অনুমোদিত হয়েছে!", show_alert=True)
 
-    # ইউজারকে নোটিফিকেশন প্রদান
     u_id = w_data.get("userId")
     amt = float(w_data.get("amount", 0.0))
     method = w_data.get("method", "Bkash/Nagad")
-    num = w_data.get("number", "N/A")
+    num = w_data.get("number", w_data.get("account", "N/A"))
 
     if u_id:
         try:
@@ -588,12 +602,12 @@ def approve_withdrawal(call):
         except Exception:
             pass
 
-    # রিফ্রেশ উইথড্র প্যানেল
+    # উইথড্রল তালিকা রিফ্রেশ
     admin_callbacks(types.CallbackQuery(id=call.id, from_user=call.from_user, data="adm_withdrawals", message=call.message, chat_instance=""))
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("wdrej_"))
 def reject_withdrawal(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         return
     w_id = call.data.replace("wdrej_", "")
     all_wd = get_all_withdrawals_from_db()
@@ -606,15 +620,21 @@ def reject_withdrawal(call):
     u_id = str(w_data.get("userId"))
     amt = float(w_data.get("amount", 0.0))
 
-    # ইউজারের ব্যালেন্সে রিফান্ড যোগ করা
     u_data = get_user_from_db(u_id) or {}
     cur_bal = float(u_data.get("balance", 0.0))
+    cur_tot = float(u_data.get("totalEarned", u_data.get("lifetimeEarnings", cur_bal)))
+    rej_cnt = int(u_data.get("rejectedCount", 0)) + 1
     new_bal = cur_bal + amt
 
-    update_user_in_db(u_id, {"balance": new_bal})
-    update_withdrawal_in_db(w_id, {"status": "rejected", "processedAt": int(time.time() * 1000)})
+    update_user_in_db(u_id, {
+        "balance": new_bal,
+        "totalEarned": cur_tot,
+        "lifetimeEarnings": cur_tot,
+        "rejectedCount": rej_cnt
+    })
+    update_withdrawal_in_db(w_id, {"status": "Rejected", "processedAt": int(time.time() * 1000)})
     
-    bot.answer_callback_query(call.id, "❌ উইথড্র বাতিল এবং ইউজারের ব্যালেন্স রিফান্ড করা হয়েছে!", show_alert=True)
+    bot.answer_callback_query(call.id, "❌ উইথড্র বাতিল এবং ব্যালেন্স রিফান্ড করা হয়েছে!", show_alert=True)
 
     if u_id:
         try:
@@ -622,29 +642,29 @@ def reject_withdrawal(call):
                 int(u_id),
                 f"""⚠️ <b>উইথড্র রিকোয়েস্ট বাতিল ও রিফান্ড নোটিশ</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>❌ ভুল তথ্য বা সমস্যার কারণে আপনার <b>৳ {amt:.2f} টাকার</b> উইথড্রল বাতিল করা হয়েছে।
-💵 টাকাটি পুনরায় আপনার মূল ওয়ালেট ব্যালেন্সে যোগ করা হয়েছে।
+<blockquote>❌ তথ্যের অমিলের কারণে আপনার <b>৳ {amt:.2f} টাকার</b> উইথড্রল বাতিল করা হয়েছে।
+💵 টাকাটি আপনার মূল ওয়ালেটে পুনরায় যোগ করা হয়েছে।
 💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_bal:.2f} টাকা</b></blockquote>
 
-💬 <i>কোনো প্রশ্ন থাকলে অ্যাডমিন সাপোর্টে যোগাযোগ করুন।</i>"""
+💬 <i>কোনো সমস্যা থাকলে অ্যাডমিন সাপোর্টে কথা বলুন।</i>"""
             )
         except Exception:
             pass
 
-    # রিফ্রেশ
     admin_callbacks(types.CallbackQuery(id=call.id, from_user=call.from_user, data="adm_withdrawals", message=call.message, chat_instance=""))
 
 # =================================================================
-# 🔍 ইউজার প্রোফাইল ও ব্যালেন্স/লাইফটাইম সিঙ্ক কন্ট্রোল
+# 🔍 ইউজার প্রোফাইল ও ব্যালেন্স/লাইফটাইম কন্ট্রোল
 # =================================================================
 def render_user_profile(user_id_str, chat_id, message_id=None):
     u_data = get_user_from_db(user_id_str)
     if not u_data:
-        text = f"❌ আইডি: <code>{user_id_str}</code> দিয়ে কোনো ইউজার খুঁজে পাওয়া যায়নি!"
+        text = f"❌ আইডি: <code>{user_id_str}</code> দিয়ে কোনো ইউজার পাওয়া যায়নি!"
         if message_id:
             bot.edit_message_text(text, chat_id, message_id)
         else:
-            bot.send_message(chat_id, text, reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, text)
+            show_admin_dashboard(chat_id)
         return
 
     name = u_data.get("name", "N/A")
@@ -668,7 +688,7 @@ def render_user_profile(user_id_str, chat_id, message_id=None):
 ✅ <b>ট্যাক্স সম্পন্ন:</b> <b>{tasks_done}</b> টি
 🛡️ <b>অ্যাকাউন্ট স্ট্যাটাস:</b> {ban_badge}</blockquote>
 
-👇 <i>এই ইউজারের একাউন্টে অ্যাকশন নিন:</i>"""
+👇 <i>এই ইউজারের একাউন্টে প্রয়োজনীয় অ্যাকশন নিন:</i>"""
 
     act_kb = types.InlineKeyboardMarkup(row_width=1)
     act_kb.add(
@@ -686,14 +706,14 @@ def render_user_profile(user_id_str, chat_id, message_id=None):
 
 def process_user_search(message):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ইউজার অনুসন্ধান বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     target_uid = message.text.strip()
     render_user_profile(target_uid, message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("uact_"))
 def user_action_callback(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         return
     
     parts = call.data.split("_")
@@ -702,12 +722,12 @@ def user_action_callback(call):
 
     if action_type == "add":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, f"➕ <b>আইডি {target_uid} এর একাউন্টে কত টাকা যোগ করতে চান?</b>\nটাকার পরিমাণ লিখুন (যেমন: 50):")
+        msg = bot.send_message(call.message.chat.id, f"➕ <b>আইডি {target_uid} এর একাউন্টে কত টাকা যোগ করবেন?</b>\nটাকার পরিমাণ লিখুন (যেমন: 50):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, process_add_balance_step, target_uid)
 
     elif action_type == "cut":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, f"➖ <b>আইডি {target_uid} এর একাউন্ট থেকে কত টাকা কর্তন করতে চান?</b>\nটাকার পরিমাণ লিখুন (যেমন: 20):")
+        msg = bot.send_message(call.message.chat.id, f"➖ <b>আইডি {target_uid} এর একাউন্ট থেকে কত টাকা কর্তন করবেন?</b>\nটাকার পরিমাণ লিখুন (যেমন: 20):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, process_cut_balance_step, target_uid)
 
     elif action_type == "ban":
@@ -715,17 +735,17 @@ def user_action_callback(call):
         new_ban = not u_data.get("isBanned", False)
         update_user_in_db(target_uid, {"isBanned": new_ban})
         res_text = "ব্যান করা হয়েছে 🚫" if new_ban else "আনব্যান করা হয়েছে 🟢"
-        bot.answer_callback_query(call.id, f"ইউজারকে সফলভাবে {res_text}", show_alert=True)
+        bot.answer_callback_query(call.id, f"ইউজারকে {res_text}", show_alert=True)
         render_user_profile(target_uid, call.message.chat.id, call.message.message_id)
 
     elif action_type == "msg":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, f"✉️ <b>আইডি {target_uid} এর কাছে যে বার্তাটি পাঠাতে চান তা লিখুন:</b>")
+        msg = bot.send_message(call.message.chat.id, f"✉️ <b>আইডি {target_uid} এর কাছে যে বার্তা পাঠাবেন তা লিখুন:</b>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, process_send_user_dm, target_uid)
 
 def process_add_balance_step(message, target_uid):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     try:
         amount = float(message.text.strip())
@@ -736,7 +756,6 @@ def process_add_balance_step(message, target_uid):
         new_bal = cur_bal + amount
         new_tot = cur_tot + amount
 
-        # ১০০% মিনি অ্যাপ সিঙ্ক ফিল্ডস
         update_user_in_db(target_uid, {
             "balance": new_bal,
             "totalEarned": new_tot,
@@ -747,8 +766,7 @@ def process_add_balance_step(message, target_uid):
 
         bot.send_message(
             message.chat.id,
-            f"✅ সফলভাবে <b>৳ {amount:.2f}</b> টাকা যোগ হয়েছে!\n💵 বর্তমান ব্যালেন্স: <b>৳ {new_bal:.2f}</b> টাকা\n📈 লাইফটাইম আর্নিং: <b>৳ {new_tot:.2f}</b> টাকা",
-            reply_markup=get_main_keyboard()
+            f"✅ সফলভাবে <b>৳ {amount:.2f}</b> টাকা যোগ হয়েছে!\n💵 বর্তমান ব্যালেন্স: <b>৳ {new_bal:.2f}</b> টাকা\n📈 লাইফটাইম আর্নিং: <b>৳ {new_tot:.2f}</b> টাকা"
         )
         try:
             bot.send_message(
@@ -757,12 +775,14 @@ def process_add_balance_step(message, target_uid):
             )
         except Exception:
             pass
+        show_admin_dashboard(message.chat.id)
     except ValueError:
-        bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা গ্রহণযোগ্য।")
+        bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা লিখুন।")
+        show_admin_dashboard(message.chat.id)
 
 def process_cut_balance_step(message, target_uid):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     try:
         amount = float(message.text.strip())
@@ -773,15 +793,17 @@ def process_cut_balance_step(message, target_uid):
 
         bot.send_message(message.chat.id, f"✅ সফলভাবে <b>৳ {amount:.2f}</b> টাকা কর্তন করা হয়েছে!\n💵 বর্তমান ব্যালেন্স: <b>৳ {new_bal:.2f}</b> টাকা")
         try:
-            bot.send_message(int(target_uid), f"⚠️ <b>ওয়ালেট আপডেট:</b>\nআপনার ওয়ালেট থেকে <b>৳ {amount:.2f} টাকা</b> কর্তন করা হয়েছে।\n💵 বর্তমান ব্যালেন্স: <b>৳ {new_bal:.2f} টাকা</b>")
+            bot.send_message(int(target_uid), f"⚠️ <b>ওয়ালেট নোটিশ:</b>\nআপনার ওয়ালেট থেকে <b>৳ {amount:.2f} টাকা</b> কর্তন করা হয়েছে।\n💵 বর্তমান ব্যালেন্স: <b>৳ {new_bal:.2f} টাকা</b>")
         except Exception:
             pass
+        show_admin_dashboard(message.chat.id)
     except ValueError:
         bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা গ্রহণযোগ্য।")
+        show_admin_dashboard(message.chat.id)
 
 def process_send_user_dm(message, target_uid):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     user_msg = message.text
     try:
@@ -796,19 +818,21 @@ def process_send_user_dm(message, target_uid):
         bot.send_message(message.chat.id, f"✅ ইউজার <code>{target_uid}</code> এর কাছে বার্তা সফলভাবে পৌঁছেছে!")
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ বার্তা পাঠানো ব্যর্থ হয়েছে: {e}")
+    show_admin_dashboard(message.chat.id)
 
 # =================================================================
 # 📢 ব্রডকাস্ট ও ম্যাস বোনাস বিতরণ
 # =================================================================
 def process_broadcast_message(message):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ব্রডকাস্ট বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
 
     broadcast_content = message.text
     users = get_all_users_from_db()
     if not users:
         bot.send_message(message.chat.id, "⚠️ ডাটাবেজে কোনো ইউজার নেই!")
+        show_admin_dashboard(message.chat.id)
         return
 
     bot.send_message(message.chat.id, "⏳ <b>সবার কাছে ব্রডকাস্ট পাঠানো শুরু হয়েছে...</b>")
@@ -830,18 +854,20 @@ def process_broadcast_message(message):
 ❌ <b>ব্যর্থ হয়েছে:</b> {failed} জন
 👥 <b>মোট ইউজার টার্গেট:</b> {len(users)} জন</blockquote>"""
         bot.send_message(ADMIN_ID, summary)
+        show_admin_dashboard(ADMIN_ID)
 
     threading.Thread(target=run_broadcast).start()
 
 def process_mass_bonus(message):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ম্যাস বোনাস বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     try:
         bonus_amt = float(message.text.strip())
         users = get_all_users_from_db()
         if not users:
             bot.send_message(message.chat.id, "⚠️ কোনো ইউজার পাওয়া যায়নি!")
+            show_admin_dashboard(message.chat.id)
             return
 
         bot.send_message(message.chat.id, f"⏳ <b>সকল ইউজারের ওয়ালেটে ৳ {bonus_amt:.2f} টাকা যোগ করা হচ্ছে...</b>")
@@ -870,61 +896,66 @@ def process_mass_bonus(message):
                     pass
 
             bot.send_message(ADMIN_ID, f"🎉 <b>সফল!</b> মোট <b>{count}</b> জন ইউজারের ওয়ালেটে <b>৳ {bonus_amt:.2f} টাকা</b> করে যুক্ত করা হয়েছে!")
+            show_admin_dashboard(ADMIN_ID)
 
         threading.Thread(target=run_mass_bonus).start()
     except ValueError:
         bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা গ্রহণযোগ্য।")
+        show_admin_dashboard(message.chat.id)
 
 # ডাইনামিক রিওয়ার্ড পরিবর্তন
 @bot.callback_query_handler(func=lambda call: call.data.startswith("set_"))
 def settings_callback(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         return
     
     if call.data == "set_ad_reward":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, "🎬 <b>নতুন ভিডিও এড রিওয়ার্ডের পরিমাণ লিখুন (যেমন: 10 বা 15):</b>")
+        msg = bot.send_message(call.message.chat.id, "🎬 <b>নতুন ভিডিও এড রিওয়ার্ডের পরিমাণ লিখুন (যেমন: 10 বা 15):</b>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, lambda m: update_reward_field(m, "ad_reward", "ভিডিও এড"))
 
     elif call.data == "set_refer_reward":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, "🎁 <b>নতুন রেফারেল বোনাসের পরিমাণ লিখুন (যেমন: 50 বা 60):</b>")
+        msg = bot.send_message(call.message.chat.id, "🎁 <b>নতুন রেফারেল বোনাসের পরিমাণ লিখুন (যেমন: 50 বা 60):</b>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, lambda m: update_reward_field(m, "refer_reward", "রেফারেল"))
 
 def update_reward_field(message, field_key, field_name_bn):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     try:
         val = float(message.text.strip())
         update_system_settings({field_key: val})
-        bot.send_message(message.chat.id, f"✅ <b>{field_name_bn} রিওয়ার্ড সফলভাবে পরিবর্তন হয়ে ৳ {val:.2f} টাকা হয়েছে!</b>", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, f"✅ <b>{field_name_bn} রিওয়ার্ড সফলভাবে পরিবর্তন হয়ে ৳ {val:.2f} টাকা হয়েছে!</b>")
+        show_admin_dashboard(message.chat.id)
     except ValueError:
         bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা লিখুন।")
+        show_admin_dashboard(message.chat.id)
 
-# ট্যাক্স অ্যাড ও ডিলিট
+# সোশ্যাল ট্যাক্স স্টেপ হ্যান্ডলার
 def process_task_title_step(message):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ট্যাক্স তৈরি বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     title = message.text.strip()
-    msg = bot.send_message(message.chat.id, f"🎯 <b>ট্যাক্স:</b> {title}\n\nধাপ ২: এই ট্যাক্সের রিওয়ার্ডের পরিমাণ লিখুন (যেমন: 5 বা 10):")
+    msg = bot.send_message(message.chat.id, f"🎯 <b>ট্যাক্স:</b> {title}\n\nধাপ ২: এই ট্যাক্সের রিওয়ার্ডের পরিমাণ লিখুন (যেমন: 5 বা 10):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_task_reward_step, title)
 
 def process_task_reward_step(message, title):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ট্যাক্স তৈরি বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     try:
         reward = float(message.text.strip())
-        msg = bot.send_message(message.chat.id, f"🎯 <b>ট্যাক্স:</b> {title}\n💰 <b>রিওয়ার্ড:</b> ৳ {reward:.2f}\n\nধাপ ৩: চ্যানেল/গ্রুপ বা ওয়েবসাইটের লিংক দিন (যেমন: https://t.me/yourchannel):")
+        msg = bot.send_message(message.chat.id, f"🎯 <b>ট্যাক্স:</b> {title}\n💰 <b>রিওয়ার্ড:</b> ৳ {reward:.2f}\n\nধাপ ৩: চ্যানেল/গ্রুপ বা ওয়েবসাইটের লিংক দিন (যেমন: https://t.me/yourchannel):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
         bot.register_next_step_handler(msg, process_task_link_step, title, reward)
     except ValueError:
         bot.send_message(message.chat.id, "❌ ভুল ইনপুট! শুধুমাত্র সংখ্যা দিন।")
+        show_admin_dashboard(message.chat.id)
 
 def process_task_link_step(message, title, reward):
     if message.text and message.text.strip() == "/cancel":
-        bot.send_message(message.chat.id, "❌ ট্যাক্স তৈরি বাতিল করা হয়েছে।")
+        show_admin_dashboard(message.chat.id)
         return
     link = message.text.strip()
     task_id = f"task_{int(time.time())}"
@@ -940,10 +971,11 @@ def process_task_link_step(message, title, reward):
         bot.send_message(message.chat.id, f"🎉 <b>নতুন ট্যাক্স সফলভাবে যোগ হয়েছে!</b>\n\n📋 টাইটেল: {title}\n💎 রিওয়ার্ড: ৳ {reward:.2f} টাকা\n🔗 লিংক: {link}")
     else:
         bot.send_message(message.chat.id, "❌ ট্যাক্স ডাটাবেজে সেভ করতে সমস্যা হয়েছে।")
+    show_admin_dashboard(message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("del_task_"))
 def execute_delete_task(call):
-    if call.from_user.id != ADMIN_ID:
+    if not is_admin(call.from_user.id):
         return
     task_id = call.data.replace("del_task_", "")
     if delete_task_from_db(task_id):
@@ -951,8 +983,7 @@ def execute_delete_task(call):
     else:
         bot.answer_callback_query(call.id, "❌ ট্যাক্স মুছতে সমস্যা হয়েছে!", show_alert=True)
     
-    admin_panel_text = f"""👑 <b>MH EARNING ULTRA MASTER ADMIN PANEL</b> 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━\nট্যাক্স তালিকা আপডেট করা হয়েছে।"""
-    bot.edit_message_text(admin_panel_text, call.message.chat.id, call.message.message_id, reply_markup=get_admin_dashboard_markup())
+    show_admin_dashboard(call.message.chat.id, call.message.message_id)
 
 # =================================================================
 # ১. /start কমান্ড হ্যান্ডলার
@@ -1173,7 +1204,6 @@ def verify_task_callback(call):
     new_total = cur_tot + task_reward
     new_tasks_count = cur_tasks_count + 1
 
-    # Firebase-এ সব ফরম্যাটে সেভ
     update_user_in_db(user_id, {
         "balance": new_balance,
         "totalEarned": new_total,
@@ -1307,6 +1337,10 @@ def back_to_main_menu(message):
 # =================================================================
 @bot.message_handler(func=lambda msg: True)
 def fallback_handler(message):
+    if is_admin(message.from_user.id):
+        show_admin_dashboard(message.chat.id)
+        return
+
     fallback_text = f"""🤖 <b>দুঃখিত! আমি আপনার মেসেজটি বুঝতে পারিনি।</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>⚡ আপনি যা করতে পারেন:

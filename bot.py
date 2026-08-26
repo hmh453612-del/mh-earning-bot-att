@@ -18,8 +18,8 @@ SUPPORT_USERNAME = "mh_earning_bot_admin"
 
 FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# 👑 অনুমোদিত অ্যাডমিন আইডি তালিকা (Telegram User ID)
-ADMIN_IDS = ["8862120350", "7358784119", "6431780517"]
+# 👑 শুধুমাত্র এই আইডিটিই একমাত্র অ্যাডমিন এক্সেস পাবে (অন্য কেউ পাবে না)
+ADMIN_IDS = ["8855522653"]
 
 AD_REWARD = 10.00
 REFER_REWARD = 50.00
@@ -47,8 +47,8 @@ def run_web_server():
 # 🛡️ পারমিশন ও ফায়ারবেস ইঞ্জিন
 # =================================================================
 def is_admin(user_id):
-    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা"""
-    return str(user_id) in ADMIN_IDS
+    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা (শুধুমাত্র 8855522653 অনুমোদিত)"""
+    return str(user_id).strip() in ADMIN_IDS
 
 def get_user_from_db(user_id):
     try:
@@ -250,7 +250,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 # ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
 # =================================================================
 def get_main_keyboard(user_id=None):
-    """সাধারণ ইউজার কিবোর্ড (অ্যাডমিনদের জন্য Admin বাটন থাকবে)"""
+    """সাধারণ ইউজার কিবোর্ড (শুধুমাত্র অ্যাডমিন 8855522653 এর জন্য Admin বাটন আসবে)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -260,6 +260,7 @@ def get_main_keyboard(user_id=None):
     keyboard.row(btn_task, btn_balance)
     keyboard.row(btn_refer, btn_support)
 
+    # শুধুমাত্র 8855522653 আইডিটিই এই বাটনটি দেখতে পারবে
     if user_id and is_admin(user_id):
         btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
         keyboard.row(btn_admin)
@@ -347,18 +348,18 @@ def send_welcome(message):
     bot.send_message(message.chat.id, "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 👑 অ্যাডমিন প্যানেল ওপেন হ্যান্ডলার (কিবোর্ড ওপেন করবে)
+# 👑 অ্যাডমিন প্যানেল ওপেন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text.lower() for w in ["👑 admin panel ⚙️", "/admin", "admin panel"]))
 def admin_panel_open(message):
     user_id = str(message.from_user.id)
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "⛔ <b>অননুমোদিত অ্যাক্সেস!</b> আপনি অ্যাডমিন নন।")
+        bot.send_message(message.chat.id, "⛔ <b>অননুমোদিত অ্যাক্সেস!</b> আপনি এই বটের অ্যাডমিন নন।")
         return
 
     admin_text = """👑 <b>MH EARNING - আলটিমেট অ্যাডমিন কন্ট্রোল প্যানেল</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ <i>স্বাগতম অ্যাডমিন! নিচের নতুন কিবোর্ড বাটনগুলো দিয়ে সহজেই সম্পূর্ণ অ্যাপ ও বট নিয়ন্ত্রণ করুন:</i>
+<blockquote>⚡ <i>স্বাগতম অ্যাডমিন! নিচের কিবোর্ড বাটনগুলো চেপে অ্যাপ ও বটের সবকিছু নিয়ন্ত্রণ করুন:</i>
 
 📊 <b>লাইভ ড্যাশবোর্ড:</b> সকল ইউজার ও পেমেন্ট হিস্ট্রি
 💸 <b>উইথড্র রিকোয়েস্ট:</b> পেমেন্ট অ্যাপ্রুভ বা রিজেক্ট
@@ -423,7 +424,7 @@ def admin_withdraws_handler(message):
 
     bot.send_message(message.chat.id, f"⏳ <b>মোট {len(pending_list)} টি পেন্ডিং উইথড্র পাওয়া গেছে:</b>")
 
-    for tx_id, tx in pending_list[:5]:  # একসাথে সর্বোচ্চ ৫টি দেখাবে
+    for tx_id, tx in pending_list[:5]:
         w_text = f"""💸 <b>পেন্ডিং উইথড্র রিকোয়েস্ট</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>👤 <b>ইউজার:</b> {tx.get('userName', 'User')}
@@ -490,7 +491,7 @@ def admin_add_task_step1(message):
     msg = bot.send_message(message.chat.id, "📝 <b>টাস্কের নাম বা টাইটেল দিন:</b>\n<i>(যেমন: Join Telegram Channel)</i>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ৬. টাস্ক ম্যানেজমেন্ট (ভিউ ও ডিলিট)
+# ৬. টাস্ক ম্যানেজমেন্ট
 @bot.message_handler(func=lambda msg: msg.text == "📋 টাস্ক ম্যানেজমেন্ট")
 def admin_manage_tasks_handler(message):
     user_id = str(message.from_user.id)
@@ -512,7 +513,7 @@ def admin_manage_tasks_handler(message):
             kb.add(types.InlineKeyboardButton("🗑️ এই টাস্কটি মুছে ফেলুন", callback_data=f"del_task_{tid}"))
             bot.send_message(message.chat.id, t_text, reply_markup=kb, disable_web_page_preview=True)
 
-# ৭. ইউজার তথ্য খুঁজুন (User Search)
+# ৭. ইউজার তথ্য খুঁজুন
 @bot.message_handler(func=lambda msg: msg.text == "🔍 ইউজার তথ্য খুঁজুন")
 def admin_search_user_handler(message):
     user_id = str(message.from_user.id)
@@ -539,7 +540,7 @@ def admin_back_to_user_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (Dynamic Multi-Step Engine)
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস
 # =================================================================
 def process_admin_input(message):
     user_id = str(message.from_user.id)
@@ -551,7 +552,7 @@ def process_admin_input(message):
         bot.send_message(message.chat.id, "❌ অপারেশন বাতিল করা হয়েছে।", reply_markup=get_admin_keyboard())
         return
 
-    # ১. সেটিংস চেঞ্জ
+    # সেটিংস চেঞ্জ
     if state == "adm_set_adreward":
         try:
             val = float(text)
@@ -588,7 +589,7 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ সঠিক পূর্ণসংখ্যা দিন!")
         admin_states.pop(user_id, None)
 
-    # ২. ব্যালেন্স পরিবর্তন
+    # ব্যালেন্স পরিবর্তন
     elif state == "adm_edit_bal_user":
         target_uid = text
         u_data = get_user_from_db(target_uid)
@@ -620,7 +621,7 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ সঠিক টাকার পরিমাণ দিন!")
         admin_states.pop(user_id, None)
 
-    # ৩. নতুন টাস্ক যুক্ত উইজার্ড
+    # নতুন টাস্ক যুক্ত উইজার্ড
     elif state == "adm_task_title":
         admin_states[user_id] = f"adm_task_reward|{text}"
         msg = bot.send_message(message.chat.id, f"💰 <b>'{text}'</b> টাস্কটির জন্য কত টাকা রিওয়ার্ড দিতে চান? (যেমন: 5.00)")
@@ -654,7 +655,7 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন।", reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # ৪. ইউজার সার্চ
+    # ইউজার সার্চ
     elif state == "adm_search_user":
         target_uid = text
         u_data = get_user_from_db(target_uid)
@@ -678,7 +679,7 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # ৫. অল ব্রডকাস্ট
+    # অল ব্রডকাস্ট
     elif state == "adm_broadcast_msg":
         broadcast_text = text
         all_users = get_all_users_from_db()
@@ -786,9 +787,9 @@ def handle_tx_decision(call):
         bot.answer_callback_query(call.id, f"Error: {e}", show_alert=True)
 
 # =================================================================
-# ২. কাজের বাটন হ্যান্ডলার (💼 কাজ ⚡ / /কাজ / কাজ)
+# ২. কাজের বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["কাজ", "work", "task", "/কাজ", "/task", "/work"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["💼 কাজ ⚡", "কাজ", "work", "task", "/কাজ", "/task", "/work"]))
 def work_options_handler(message):
     reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -804,7 +805,7 @@ def work_options_handler(message):
 # =================================================================
 # ৩. ভিডিও এড দেখুন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ভিডিও", "video", "/video", "এড"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🎬 ভিডিও এড দেখুন", "ভিডিও", "video", "/video", "এড"]))
 def video_ad_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -839,7 +840,7 @@ def video_ad_handler(message):
 # =================================================================
 # ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ট্যাক্স", "টাস্ক", "tasks"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["📋 ট্যাক্স সম্পূর্ণ করুন", "ট্যাক্স", "টাস্ক", "tasks"]))
 def task_dashboard_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -889,7 +890,7 @@ def task_dashboard_handler(message):
     if pending_tasks_count == 0:
         bot.send_message(
             message.chat.id, 
-            "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন。", 
+            "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন।", 
             reply_markup=get_main_keyboard(user_id)
         )
     else:
@@ -954,7 +955,7 @@ def verify_task_callback(call):
 # =================================================================
 # ৫. ব্যালেন্স বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ব্যালেন্স", "balance", "/balance"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["💰 ব্যালেন্স 💎", "ব্যালেন্স", "balance", "/balance"]))
 def balance_handler(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name or "User"
@@ -987,7 +988,7 @@ def balance_handler(message):
 # =================================================================
 # ৬. রেফার বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["রেফার", "refer", "/refer"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 রেফার 🎁", "রেফার", "refer", "/refer"]))
 def refer_handler(message):
     user_id = str(message.from_user.id)
     referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
@@ -1022,7 +1023,7 @@ def refer_handler(message):
 # =================================================================
 # ৭. সাপোর্ট বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["সাপোর্ট", "support", "/support"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🛠️ সাপোর্ট 💬", "সাপোর্ট", "support", "/support"]))
 def support_handler(message):
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_admin = types.InlineKeyboardButton(text="👨‍💻 এডমিন লাইভ সাপোর্ট 💬", url=f"https://t.me/{SUPPORT_USERNAME}")
@@ -1048,6 +1049,17 @@ def back_to_main_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
+# ❓ অপরিচিত ও অনাকাঙ্ক্ষিত মেসেজ হ্যান্ডলার (Fallback Handler)
+# =================================================================
+@bot.message_handler(func=lambda msg: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker'])
+def fallback_unknown_message(message):
+    user_id = str(message.from_user.id)
+    fallback_text = """🤖 <b>দুঃখিত! আপনি যা লিখেছেন তা আমি বুঝতে পারিনি।</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
+    bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id))
+
+# =================================================================
 # 🚀 মেইন ইঞ্জিন রানার
 # =================================================================
 if __name__ == "__main__":
@@ -1056,5 +1068,5 @@ if __name__ == "__main__":
     server_thread.daemon = True
     server_thread.start()
 
-    print("✅ MH Earning Bot Ultra Pro Engine সফলভাবে চালু হয়েছে...")
+    print("✅ MH Earning Bot Engine সফলভাবে চালু হয়েছে...")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)

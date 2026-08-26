@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 import urllib.parse
 from datetime import datetime
 from flask import Flask
@@ -8,7 +9,7 @@ import telebot
 from telebot import types
 
 # =================================================================
-# ⚙️ কনফিগারেশন সেটিংস (Configuration)
+# ⚙️ কনফিগারেশন ও অ্যাডমিন সেটিংস (Configuration)
 # =================================================================
 BOT_TOKEN = "8862120350:AAGAbapwq17iwwGGuTbTjW8COWskalp2EKE"
 BOT_USERNAME = "mhearningxl_bot"
@@ -17,11 +18,17 @@ SUPPORT_USERNAME = "mh_earning_bot_admin"
 
 FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
 
+# 👑 অনুমোদিত অ্যাডমিন আইডি তালিকা (Telegram User ID)
+ADMIN_IDS = ["8862120350", "7358784119", "6431780517"]
+
 AD_REWARD = 10.00
 REFER_REWARD = 50.00
 
 # টেলিগ্রাম বট ইঞ্জিন
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=True)
+
+# অ্যাডমিন অ্যাকশন ও স্টেট ট্র্যাকার
+admin_states = {}
 
 # =================================================================
 # 🌐 Render Keep-Alive Web Server
@@ -30,15 +37,19 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "MH Earning Bot Ultra Engine is Running 24/7!"
+    return "MH Earning Bot Ultra Pro Engine is Running 24/7!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
 # =================================================================
-# 🔥 Firebase Helper Engine (মিনি অ্যাপের সাথে ১০০% সিঙ্ক)
+# 🛡️ পারমিশন ও ফায়ারবেস ইঞ্জিন
 # =================================================================
+def is_admin(user_id):
+    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা"""
+    return str(user_id) in ADMIN_IDS
+
 def get_user_from_db(user_id):
     try:
         url = f"{FIREBASE_DB_URL}/users/{user_id}.json"
@@ -56,19 +67,37 @@ def update_user_in_db(user_id, data):
     except Exception as e:
         print(f"Firebase Update Error: {e}")
 
+def get_all_users_from_db():
+    try:
+        url = f"{FIREBASE_DB_URL}/users.json"
+        res = requests.get(url, timeout=6)
+        if res.status_code == 200 and res.json():
+            return res.json()
+    except Exception as e:
+        print(f"Fetch Users Error: {e}")
+    return {}
+
 def get_settings_from_db():
-    """ফায়ারবেজ থেকে লাইভ সেটিংস লোড করা"""
     try:
         url = f"{FIREBASE_DB_URL}/settings.json"
         res = requests.get(url, timeout=4)
         if res.status_code == 200 and res.json():
             return res.json()
-    except Exception as e:
-        print(f"Firebase Settings Fetch Error: {e}")
+    except Exception:
+        pass
     return {}
 
+def update_settings_in_db(data):
+    try:
+        url = f"{FIREBASE_DB_URL}/settings.json"
+        requests.patch(url, json=data, timeout=5)
+        requests.patch(f"{FIREBASE_DB_URL}/config.json", json=data, timeout=3)
+        return True
+    except Exception as e:
+        print(f"Settings Update Error: {e}")
+        return False
+
 def get_all_tasks_from_db():
-    """ফায়ারবেজ থেকে টাস্ক লোড করা"""
     try:
         url = f"{FIREBASE_DB_URL}/tasks.json"
         res = requests.get(url, timeout=5)
@@ -78,8 +107,35 @@ def get_all_tasks_from_db():
         print(f"Firebase Tasks Fetch Error: {e}")
     return {}
 
+def add_task_to_db(task_data):
+    try:
+        url = f"{FIREBASE_DB_URL}/tasks.json"
+        res = requests.post(url, json=task_data, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Add Task Error: {e}")
+        return False
+
+def delete_task_from_db(task_id):
+    try:
+        url = f"{FIREBASE_DB_URL}/tasks/{task_id}.json"
+        requests.delete(url, timeout=5)
+        return True
+    except Exception as e:
+        print(f"Delete Task Error: {e}")
+        return False
+
+def get_all_transactions_from_db():
+    try:
+        url = f"{FIREBASE_DB_URL}/transactions.json"
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200 and res.json():
+            return res.json()
+    except Exception:
+        pass
+    return {}
+
 def extract_telegram_username(url):
-    """টেলিগ্রাম লিংক থেকে ইউজারনেম বের করার ফাংশন"""
     if not url:
         return None
     if '/+' in url or '/joinchat/' in url or 'joinchat' in url:
@@ -96,7 +152,6 @@ def extract_telegram_username(url):
     return None
 
 def verify_telegram_membership(channel_username, user_id):
-    """টেলিগ্রাম চ্যানেলে জয়েন আছে কি না স্বয়ংক্রিয়ভাবে যাচাই করা"""
     try:
         chat_member = bot.get_chat_member(f"@{channel_username}", int(user_id))
         if chat_member.status in ['member', 'administrator', 'creator', 'restricted']:
@@ -105,8 +160,10 @@ def verify_telegram_membership(channel_username, user_id):
         print(f"Channel Verify Error: {e}")
     return False
 
+# =================================================================
+# 👥 রেফারেল ও একাউন্ট হ্যান্ডলার
+# =================================================================
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
-    """নতুন ইউজার তৈরি ও ইনস্ট্যান্ট রেফার বোনাস সিস্টেম"""
     user_id_str = str(user_id)
     user_data = get_user_from_db(user_id_str)
     now = datetime.now()
@@ -190,9 +247,10 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
         })
 
 # =================================================================
-# ⌨️ কিবোর্ড লেআউটসমূহ (Main & Sub Keyboards)
+# ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
 # =================================================================
-def get_main_keyboard():
+def get_main_keyboard(user_id=None):
+    """সাধারণ ইউজার কিবোর্ড (অ্যাডমিনদের জন্য Admin বাটন থাকবে)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -201,6 +259,36 @@ def get_main_keyboard():
 
     keyboard.row(btn_task, btn_balance)
     keyboard.row(btn_refer, btn_support)
+
+    if user_id and is_admin(user_id):
+        btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
+        keyboard.row(btn_admin)
+
+    return keyboard
+
+def get_admin_keyboard():
+    """👑 এক্সক্লুসিভ অ্যাডমিন কিবোর্ড মেন্যু"""
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    
+    btn_stats = types.KeyboardButton("📊 লাইভ ড্যাশবোর্ড")
+    btn_withdraw = types.KeyboardButton("💸 উইথড্র রিকোয়েস্ট")
+    
+    btn_settings = types.KeyboardButton("⚙️ অ্যাপ সেটিংস")
+    btn_balance = types.KeyboardButton("💰 ব্যালেন্স পরিবর্তন")
+    
+    btn_add_task = types.KeyboardButton("➕ নতুন টাস্ক যুক্ত")
+    btn_manage_tasks = types.KeyboardButton("📋 টাস্ক ম্যানেজমেন্ট")
+    
+    btn_search_user = types.KeyboardButton("🔍 ইউজার তথ্য খুঁজুন")
+    btn_broadcast = types.KeyboardButton("📢 অল ব্রডকাস্ট")
+    
+    btn_back_user = types.KeyboardButton("🏠 ইউজার মেন্যুতে যান")
+
+    keyboard.row(btn_stats, btn_withdraw)
+    keyboard.row(btn_settings, btn_balance)
+    keyboard.row(btn_add_task, btn_manage_tasks)
+    keyboard.row(btn_search_user, btn_broadcast)
+    keyboard.row(btn_back_user)
     return keyboard
 
 def get_work_keyboard():
@@ -256,7 +344,446 @@ def send_welcome(message):
 <code>{referral_link}</code>"""
 
     bot.send_message(message.chat.id, welcome_text, reply_markup=inline_kb, disable_web_page_preview=True)
-    bot.send_message(message.chat.id, "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>", reply_markup=get_main_keyboard())
+    bot.send_message(message.chat.id, "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>", reply_markup=get_main_keyboard(user_id))
+
+# =================================================================
+# 👑 অ্যাডমিন প্যানেল ওপেন হ্যান্ডলার (কিবোর্ড ওপেন করবে)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text.lower() for w in ["👑 admin panel ⚙️", "/admin", "admin panel"]))
+def admin_panel_open(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id):
+        bot.send_message(message.chat.id, "⛔ <b>অননুমোদিত অ্যাক্সেস!</b> আপনি অ্যাডমিন নন।")
+        return
+
+    admin_text = """👑 <b>MH EARNING - আলটিমেট অ্যাডমিন কন্ট্রোল প্যানেল</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ <i>স্বাগতম অ্যাডমিন! নিচের নতুন কিবোর্ড বাটনগুলো দিয়ে সহজেই সম্পূর্ণ অ্যাপ ও বট নিয়ন্ত্রণ করুন:</i>
+
+📊 <b>লাইভ ড্যাশবোর্ড:</b> সকল ইউজার ও পেমেন্ট হিস্ট্রি
+💸 <b>উইথড্র রিকোয়েস্ট:</b> পেমেন্ট অ্যাপ্রুভ বা রিজেক্ট
+⚙️ <b>অ্যাপ সেটিংস:</b> রিওয়ার্ড ও উইথড্র লিমিট চেঞ্জ
+💰 <b>ব্যালেন্স পরিবর্তন:</b> ইউজার ব্যালেন্স যোগ/বিয়োগ
+➕ <b>নতুন টাস্ক:</b> সরাসরি চ্যানেল টাস্ক এড করুন
+📋 <b>টাস্ক ডিলিট:</b> সক্রিয় টাস্ক তালিকা ও মুছে ফেলা
+🔍 <b>ইউজার সার্চ:</b> ইউজারের বিস্তারিত একাউন্ট তথ্য
+📢 <b>অল ব্রডকাস্ট:</b> সকল ইউজারকে নোটিফিকেশন পাঠানো</blockquote>
+
+👇 <i>যেকোনো একটি বাটন চেপে কাজ শুরু করুন:</i>"""
+
+    bot.send_message(message.chat.id, admin_text, reply_markup=get_admin_keyboard())
+
+# =================================================================
+# 👑 অ্যাডমিন কিবোর্ড বাটন হ্যান্ডলারসমূহ
+# =================================================================
+
+# ১. লাইভ ড্যাশবোর্ড
+@bot.message_handler(func=lambda msg: msg.text == "📊 লাইভ ড্যাশবোর্ড")
+def admin_dashboard_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    all_users = get_all_users_from_db()
+    all_tx = get_all_transactions_from_db()
+    all_tasks = get_all_tasks_from_db()
+
+    total_users = len(all_users)
+    total_balance = sum(float(u.get("balance", 0.0)) for u in all_users.values() if isinstance(u, dict))
+    
+    pending_withdraws = sum(1 for tx in all_tx.values() if isinstance(tx, dict) and tx.get("status") == "Pending")
+    total_paid = sum(float(tx.get("amount", 0.0)) for tx in all_tx.values() if isinstance(tx, dict) and tx.get("status") == "Approved")
+
+    now = datetime.now()
+    start_of_today = datetime(now.year, now.month, now.day).timestamp() * 1000
+    today_users = sum(1 for u in all_users.values() if isinstance(u, dict) and float(u.get("joinedAt", 0)) >= start_of_today)
+
+    stats_text = f"""📊 <b>বট ও মিনি অ্যাপের লাইভ স্ট্যাটিস্টিকস</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>👥 <b>মোট ইউজার:</b> <b>{total_users} জন</b>
+🆕 <b>আজকের নতুন ইউজার:</b> <b>{today_users} জন</b>
+💰 <b>ইউজারদের মোট ব্যালেন্স:</b> <b>৳ {total_balance:.2f} টাকা</b>
+💸 <b>পেমেন্ট সম্পন্ন:</b> <b>৳ {total_paid:.2f} টাকা</b>
+⏳ <b>পেন্ডিং উইথড্র:</b> <b>{pending_withdraws} টি</b>
+📋 <b>সচল টাস্ক সংখ্যা:</b> <b>{len(all_tasks)} টি</b></blockquote>"""
+
+    bot.send_message(message.chat.id, stats_text)
+
+# ২. উইথড্র রিকোয়েস্ট
+@bot.message_handler(func=lambda msg: msg.text == "💸 উইথড্র রিকোয়েস্ট")
+def admin_withdraws_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    all_tx = get_all_transactions_from_db()
+    pending_list = [(k, v) for k, v in all_tx.items() if isinstance(v, dict) and v.get("status") == "Pending"]
+
+    if not pending_list:
+        bot.send_message(message.chat.id, "✅ <b>বর্তমানে কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই!</b>")
+        return
+
+    bot.send_message(message.chat.id, f"⏳ <b>মোট {len(pending_list)} টি পেন্ডিং উইথড্র পাওয়া গেছে:</b>")
+
+    for tx_id, tx in pending_list[:5]:  # একসাথে সর্বোচ্চ ৫টি দেখাবে
+        w_text = f"""💸 <b>পেন্ডিং উইথড্র রিকোয়েস্ট</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>👤 <b>ইউজার:</b> {tx.get('userName', 'User')}
+🆔 <b>আইডি:</b> <code>{tx.get('userId')}</code>
+💳 <b>মেথড:</b> <b>{tx.get('method')}</b>
+📱 <b>নাম্বার:</b> <code>{tx.get('account') or tx.get('number')}</code>
+💰 <b>পরিমাণ:</b> <b>৳ {float(tx.get('amount', 0.0)):.2f} টাকা</b>
+⏰ <b>সময়:</b> {tx.get('date', '')} {tx.get('time', '')}</blockquote>"""
+
+        kb = types.InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            types.InlineKeyboardButton("✅ Approve", callback_data=f"tx_app_{tx_id}"),
+            types.InlineKeyboardButton("❌ Reject", callback_data=f"tx_rej_{tx_id}")
+        )
+        bot.send_message(message.chat.id, w_text, reply_markup=kb)
+
+# ৩. অ্যাপ সেটিংস
+@bot.message_handler(func=lambda msg: msg.text == "⚙️ অ্যাপ সেটিংস")
+def admin_settings_menu_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    cfg = get_settings_from_db()
+    ad_rew = float(cfg.get("adReward") or cfg.get("ad_reward") or AD_REWARD)
+    ref_rew = float(cfg.get("referReward") or cfg.get("refer_reward") or REFER_REWARD)
+    min_w = float(cfg.get("minWithdraw") or cfg.get("min_withdraw") or 1020)
+    daily_l = int(cfg.get("dailyAdLimit") or cfg.get("daily_ad_limit") or 10)
+
+    settings_text = f"""⚙️ <b>অ্যাপ সেটিংস ড্যাশবোর্ড</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🎬 <b>প্রতি অ্যাড রিওয়ার্ড:</b> <b>৳ {ad_rew:.2f}</b>
+👥 <b>রেফারেল বোনাস:</b> <b>৳ {ref_rew:.2f}</b>
+💳 <b>সর্বনিম্ন উইথড্র:</b> <b>৳ {min_w:.2f}</b>
+📊 <b>দৈনিক অ্যাড লিমিট:</b> <b>{daily_l} টি</b></blockquote>
+
+👇 <i>যেকোনো মান পরিবর্তন করতে নিচের অপশন নির্বাচন করুন:</i>"""
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("🎬 অ্যাড টাকা বদলান", callback_data="adm_set_adreward"),
+        types.InlineKeyboardButton("👥 রেফার টাকা বদলান", callback_data="adm_set_referreward"),
+        types.InlineKeyboardButton("💳 উইথড্র লিমিট বদলান", callback_data="adm_set_minwithdraw"),
+        types.InlineKeyboardButton("📊 অ্যাড লিমিট বদলান", callback_data="adm_set_adlimit")
+    )
+    bot.send_message(message.chat.id, settings_text, reply_markup=kb)
+
+# ৪. ব্যালেন্স পরিবর্তন
+@bot.message_handler(func=lambda msg: msg.text == "💰 ব্যালেন্স পরিবর্তন")
+def admin_balance_edit_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    admin_states[user_id] = "adm_edit_bal_user"
+    msg = bot.send_message(message.chat.id, "👤 যে ইউজারের ব্যালেন্স পরিবর্তন করতে চান তার <b>Telegram ID</b> লিখুন:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+
+# ৫. নতুন টাস্ক যুক্ত
+@bot.message_handler(func=lambda msg: msg.text == "➕ নতুন টাস্ক যুক্ত")
+def admin_add_task_step1(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    admin_states[user_id] = "adm_task_title"
+    msg = bot.send_message(message.chat.id, "📝 <b>টাস্কের নাম বা টাইটেল দিন:</b>\n<i>(যেমন: Join Telegram Channel)</i>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+
+# ৬. টাস্ক ম্যানেজমেন্ট (ভিউ ও ডিলিট)
+@bot.message_handler(func=lambda msg: msg.text == "📋 টাস্ক ম্যানেজমেন্ট")
+def admin_manage_tasks_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    all_tasks = get_all_tasks_from_db()
+    if not all_tasks:
+        bot.send_message(message.chat.id, "📋 <b>বর্তমানে কোনো টাস্ক যুক্ত নেই!</b>")
+        return
+
+    bot.send_message(message.chat.id, "📋 <b>বর্তমানে চালু থাকা টাস্ক তালিকা:</b>")
+    for tid, t in all_tasks.items():
+        if isinstance(t, dict):
+            t_text = f"""🔹 <b>{t.get('title')}</b>
+💰 <b>রিওয়ার্ড:</b> ৳ {float(t.get('reward', 0)):.2f}
+🔗 <b>লিংক:</b> {t.get('link')}"""
+            
+            kb = types.InlineKeyboardMarkup()
+            kb.add(types.InlineKeyboardButton("🗑️ এই টাস্কটি মুছে ফেলুন", callback_data=f"del_task_{tid}"))
+            bot.send_message(message.chat.id, t_text, reply_markup=kb, disable_web_page_preview=True)
+
+# ৭. ইউজার তথ্য খুঁজুন (User Search)
+@bot.message_handler(func=lambda msg: msg.text == "🔍 ইউজার তথ্য খুঁজুন")
+def admin_search_user_handler(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    admin_states[user_id] = "adm_search_user"
+    msg = bot.send_message(message.chat.id, "🔍 যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b> পাঠান:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+
+# ৮. অল ব্রডকাস্ট
+@bot.message_handler(func=lambda msg: msg.text == "📢 অল ব্রডকাস্ট")
+def admin_broadcast_prompt(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id): return
+
+    admin_states[user_id] = "adm_broadcast_msg"
+    msg = bot.send_message(message.chat.id, "📢 সব ইউজারের কাছে যে মেসেজটি পাঠাতে চান তা লিখুন (HTML ফরম্যাট সমর্থিত):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+
+# ৯. ইউজার মেন্যুতে ব্যাক
+@bot.message_handler(func=lambda msg: msg.text == "🏠 ইউজার মেন্যুতে যান")
+def admin_back_to_user_menu(message):
+    user_id = str(message.from_user.id)
+    bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
+
+# =================================================================
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (Dynamic Multi-Step Engine)
+# =================================================================
+def process_admin_input(message):
+    user_id = str(message.from_user.id)
+    state = admin_states.get(user_id)
+    text = message.text.strip() if message.text else ""
+
+    if text.lower() == "/cancel":
+        admin_states.pop(user_id, None)
+        bot.send_message(message.chat.id, "❌ অপারেশন বাতিল করা হয়েছে।", reply_markup=get_admin_keyboard())
+        return
+
+    # ১. সেটিংস চেঞ্জ
+    if state == "adm_set_adreward":
+        try:
+            val = float(text)
+            update_settings_in_db({"adReward": val, "ad_reward": val, "adRate": val, "rewardPerAd": val})
+            bot.send_message(message.chat.id, f"✅ <b>সফল!</b> প্রতি ভিডিও অ্যাডের টাকা <b>৳ {val:.2f}</b> এ সেট করা হয়েছে।")
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক সংখ্যা দিন!")
+        admin_states.pop(user_id, None)
+
+    elif state == "adm_set_referreward":
+        try:
+            val = float(text)
+            update_settings_in_db({"referReward": val, "refer_reward": val, "referRate": val})
+            bot.send_message(message.chat.id, f"✅ <b>সফল!</b> রেফারেল বোনাস <b>৳ {val:.2f}</b> এ সেট করা হয়েছে।")
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক সংখ্যা দিন!")
+        admin_states.pop(user_id, None)
+
+    elif state == "adm_set_minwithdraw":
+        try:
+            val = float(text)
+            update_settings_in_db({"minWithdraw": val, "min_withdraw": val})
+            bot.send_message(message.chat.id, f"✅ <b>সফল!</b> সর্বনিম্ন উইথড্র <b>৳ {val:.2f}</b> এ সেট করা হয়েছে।")
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক সংখ্যা দিন!")
+        admin_states.pop(user_id, None)
+
+    elif state == "adm_set_adlimit":
+        try:
+            val = int(text)
+            update_settings_in_db({"dailyAdLimit": val, "daily_ad_limit": val, "adLimit": val})
+            bot.send_message(message.chat.id, f"✅ <b>সফল!</b> দৈনিক ভিডিও লিমিট <b>{val} টি</b> সেট করা হয়েছে।")
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক পূর্ণসংখ্যা দিন!")
+        admin_states.pop(user_id, None)
+
+    # ২. ব্যালেন্স পরিবর্তন
+    elif state == "adm_edit_bal_user":
+        target_uid = text
+        u_data = get_user_from_db(target_uid)
+        if not u_data:
+            bot.send_message(message.chat.id, "❌ এই আইডির কোনো ইউজার পাওয়া যায়নি!")
+            admin_states.pop(user_id, None)
+            return
+
+        admin_states[user_id] = f"adm_edit_bal_amt_{target_uid}"
+        msg = bot.send_message(message.chat.id, f"👤 ইউজার: <b>{u_data.get('name')}</b>\n💵 বর্তমান ব্যালেন্স: <b>৳ {float(u_data.get('balance', 0.0)):.2f}</b>\n\n👉 ব্যালেন্স যোগ করতে ধনাত্মক (যেমন: <b>50</b>) বা কাটতে ঋণাত্মক (যেমন: <b>-20</b>) সংখ্যা লিখুন:")
+        bot.register_next_step_handler(msg, process_admin_input)
+
+    elif state and state.startswith("adm_edit_bal_amt_"):
+        target_uid = state.replace("adm_edit_bal_amt_", "")
+        try:
+            amt = float(text)
+            u_data = get_user_from_db(target_uid) or {}
+            old_bal = float(u_data.get("balance", 0.0))
+            new_bal = max(0.0, old_bal + amt)
+
+            update_user_in_db(target_uid, {"balance": new_bal})
+            bot.send_message(message.chat.id, f"✅ ইউজার (<code>{target_uid}</code>) এর ব্যালেন্স আপডেট হয়েছে!\nপূর্বের ব্যালেন্স: ৳ {old_bal:.2f}\nনতুন ব্যালেন্স: <b>৳ {new_bal:.2f} টাকা</b>", reply_markup=get_admin_keyboard())
+            
+            try:
+                bot.send_message(int(target_uid), f"🔔 অ্যাডমিন কর্তৃক আপনার ব্যালেন্স আপডেট করা হয়েছে!\n💰 বর্তমান নতুন ব্যালেন্স: <b>৳ {new_bal:.2f} টাকা</b>")
+            except Exception:
+                pass
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক টাকার পরিমাণ দিন!")
+        admin_states.pop(user_id, None)
+
+    # ৩. নতুন টাস্ক যুক্ত উইজার্ড
+    elif state == "adm_task_title":
+        admin_states[user_id] = f"adm_task_reward|{text}"
+        msg = bot.send_message(message.chat.id, f"💰 <b>'{text}'</b> টাস্কটির জন্য কত টাকা রিওয়ার্ড দিতে চান? (যেমন: 5.00)")
+        bot.register_next_step_handler(msg, process_admin_input)
+
+    elif state and state.startswith("adm_task_reward|"):
+        title = state.split("|")[1]
+        try:
+            rew = float(text)
+            admin_states[user_id] = f"adm_task_link|{title}|{rew}"
+            msg = bot.send_message(message.chat.id, "🔗 <b>টেলিগ্রাম চ্যানেল বা গ্রুপের লিংক দিন:</b>\n<i>(যেমন: https://t.me/yourchannel)</i>")
+            bot.register_next_step_handler(msg, process_admin_input)
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক সংখ্যা দিন!")
+            admin_states.pop(user_id, None)
+
+    elif state and state.startswith("adm_task_link|"):
+        _, title, rew_str = state.split("|")
+        rew = float(rew_str)
+        link = text
+
+        new_task = {
+            "title": title,
+            "reward": rew,
+            "link": link,
+            "createdAt": int(time.time() * 1000)
+        }
+        if add_task_to_db(new_task):
+            bot.send_message(message.chat.id, f"🎉 <b>সফলভাবে নতুন টাস্ক যুক্ত করা হয়েছে!</b>\n\n📌 টাইটেল: {title}\n💰 রিওয়ার্ড: ৳ {rew:.2f}\n🔗 লিংক: {link}", reply_markup=get_admin_keyboard())
+        else:
+            bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন।", reply_markup=get_admin_keyboard())
+        admin_states.pop(user_id, None)
+
+    # ৪. ইউজার সার্চ
+    elif state == "adm_search_user":
+        target_uid = text
+        u_data = get_user_from_db(target_uid)
+        if not u_data:
+            bot.send_message(message.chat.id, "❌ এই আইডির কোনো ইউজার পাওয়া যায়নি!", reply_markup=get_admin_keyboard())
+        else:
+            joined_date = "N/A"
+            if u_data.get("joinedAt"):
+                joined_date = datetime.fromtimestamp(u_data.get("joinedAt")/1000).strftime('%d/%m/%Y %I:%M %p')
+            
+            u_info = f"""👤 <b>ইউজার প্রোফাইল ডাটাবেজ</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🆔 <b>টেলিগ্রাম আইডি:</b> <code>{target_uid}</code>
+🏷️ <b>নাম:</b> {u_data.get('name', 'N/A')}
+🔗 <b>ইউজারনেম:</b> {u_data.get('username', 'N/A')}
+💵 <b>ব্যালেন্স:</b> <b>৳ {float(u_data.get('balance', 0.0)):.2f}</b>
+👥 <b>রেফার করেছে:</b> {u_data.get('referrals', 0)} জন
+🎬 <b>দেখা ভিডিও:</b> {u_data.get('adsWatched', 0)} টি
+✅ <b>টাস্ক সম্পন্ন:</b> {u_data.get('completedTasksCount', 0)} টি
+📅 <b>জয়েন তারিখ:</b> {joined_date}</blockquote>"""
+            bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
+        admin_states.pop(user_id, None)
+
+    # ৫. অল ব্রডকাস্ট
+    elif state == "adm_broadcast_msg":
+        broadcast_text = text
+        all_users = get_all_users_from_db()
+        user_list = list(all_users.keys())
+
+        bot.send_message(message.chat.id, f"🚀 <b>ব্রডকাস্ট শুরু হচ্ছে...</b> (মোট ইউজার: {len(user_list)} জন)", reply_markup=get_admin_keyboard())
+        
+        def run_broadcast():
+            success, failed = 0, 0
+            for uid in user_list:
+                try:
+                    bot.send_message(int(uid), broadcast_text, parse_mode="HTML")
+                    success += 1
+                except Exception:
+                    failed += 1
+                time.sleep(0.04)
+
+            bot.send_message(int(user_id), f"🎉 <b>ব্রডকাস্ট সম্পন্ন হয়েছে!</b>\n✅ সফল: {success} জন\n❌ ব্যর্থ: {failed} জন")
+
+        threading.Thread(target=run_broadcast).start()
+        admin_states.pop(user_id, None)
+
+# =================================================================
+# 👑 অ্যাডমিন ইনলাইন বাটন ও কলব্যাক হ্যান্ডলার
+# =================================================================
+@bot.callback_query_handler(func=lambda call: call.data.startswith("adm_set_"))
+def admin_settings_callback(call):
+    user_id = str(call.from_user.id)
+    if not is_admin(user_id):
+        bot.answer_callback_query(call.id, "⛔ পারমিশন নেই!", show_alert=True)
+        return
+
+    action = call.data
+    admin_states[user_id] = action
+    prompt_map = {
+        "adm_set_adreward": "🎬 প্রতি অ্যাডে কত টাকা দিতে চান? (যেমন: 15)",
+        "adm_set_referreward": "👥 প্রতি রেফারে কত টাকা দিতে চান? (যেমন: 60)",
+        "adm_set_minwithdraw": "💳 সর্বনিম্ন উইথড্র কত করতে চান? (যেমন: 1000)",
+        "adm_set_adlimit": "📊 প্রতিদিন কতটি ভিডিও অ্যাড দেখাতে চান? (যেমন: 15)"
+    }
+    msg = bot.send_message(call.message.chat.id, f"📝 <b>ইনপুট প্রদান করুন:</b>\n{prompt_map[action]}\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("del_task_"))
+def admin_delete_task(call):
+    user_id = str(call.from_user.id)
+    if not is_admin(user_id): return
+
+    task_id = call.data.replace("del_task_", "")
+    if delete_task_from_db(task_id):
+        bot.answer_callback_query(call.id, "🗑️ টাস্কটি মুছে ফেলা হয়েছে!", show_alert=True)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    else:
+        bot.answer_callback_query(call.id, "❌ টাস্ক মুছতে সমস্যা হয়েছে!", show_alert=True)
+
+# উইথড্র রিকোয়েস্ট Approve / Reject
+@bot.callback_query_handler(func=lambda call: call.data.startswith("tx_app_") or call.data.startswith("tx_rej_"))
+def handle_tx_decision(call):
+    user_id = str(call.from_user.id)
+    if not is_admin(user_id):
+        bot.answer_callback_query(call.id, "⛔ অননুমোদিত!", show_alert=True)
+        return
+
+    is_approve = call.data.startswith("tx_app_")
+    tx_id = call.data.replace("tx_app_", "").replace("tx_rej_", "")
+
+    try:
+        tx_url = f"{FIREBASE_DB_URL}/transactions/{tx_id}.json"
+        tx_res = requests.get(tx_url, timeout=5)
+        tx = tx_res.json() if tx_res.status_code == 200 else None
+
+        if not tx:
+            bot.answer_callback_query(call.id, "❌ লেনদেন ডাটা পাওয়া যায়নি!", show_alert=True)
+            return
+
+        target_uid = str(tx.get("userId"))
+        amount = float(tx.get("amount", 0.0))
+
+        if is_approve:
+            requests.patch(tx_url, json={"status": "Approved"}, timeout=5)
+            bot.answer_callback_query(call.id, "✅ উইথড্র Approved করা হয়েছে!", show_alert=True)
+            bot.edit_message_text(f"✅ <b>উইথড্র অ্যাপ্রুভড!</b>\nইউজার: {target_uid} | পরিমাণ: ৳ {amount:.2f}", call.message.chat.id, call.message.message_id)
+
+            try:
+                bot.send_message(int(target_uid), f"🎉 <b>অভিনন্দন! আপনার ৳ {amount:.2f} টাকার উইথড্র সফলভাবে পেমেন্ট করা হয়েছে!</b> 💸")
+            except Exception:
+                pass
+        else:
+            requests.patch(tx_url, json={"status": "Rejected"}, timeout=5)
+            u_data = get_user_from_db(target_uid) or {}
+            c_bal = float(u_data.get("balance", 0.0))
+            c_rej = int(u_data.get("rejectedCount", 0)) + 1
+
+            update_user_in_db(target_uid, {"balance": c_bal + amount, "rejectedCount": c_rej})
+
+            bot.answer_callback_query(call.id, "❌ উইথড্র Rejected ও টাকা রিফান্ড করা হয়েছে!", show_alert=True)
+            bot.edit_message_text(f"❌ <b>উইথড্র রিজেক্টেড ও টাকা ফেরত দেওয়া হয়েছে!</b>\nইউজার: {target_uid} | রিফান্ড: ৳ {amount:.2f}", call.message.chat.id, call.message.message_id)
+
+            try:
+                bot.send_message(int(target_uid), f"⚠️ <b>আপনার ৳ {amount:.2f} টাকার উইথড্র রিকোয়েস্ট বাতিল করা হয়েছে এবং টাকা মূল ব্যালেন্সে রিফান্ড করা হয়েছে।</b>")
+            except Exception:
+                pass
+    except Exception as e:
+        bot.answer_callback_query(call.id, f"Error: {e}", show_alert=True)
 
 # =================================================================
 # ২. কাজের বাটন হ্যান্ডলার (💼 কাজ ⚡ / /কাজ / কাজ)
@@ -275,7 +802,7 @@ def work_options_handler(message):
     bot.send_message(message.chat.id, reply_text, reply_markup=get_work_keyboard())
 
 # =================================================================
-# ৩. ভিডিও এড দেখুন হ্যান্ডলার (Server 1 & Server 2 বাটন আপডেট)
+# ৩. ভিডিও এড দেখুন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ভিডিও", "video", "/video", "এড"]))
 def video_ad_handler(message):
@@ -287,11 +814,9 @@ def video_ad_handler(message):
     current_ad_reward = float(cfg.get("adReward") or cfg.get("ad_reward") or AD_REWARD)
     current_daily_limit = int(cfg.get("dailyAdLimit") or cfg.get("daily_ad_limit") or 10)
 
-    # Server 1 & Server 2 এর ডাইরেক্ট লিঙ্ক
     server1_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=1&tgWebAppStartParam={user_id}"
     server2_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=2&tgWebAppStartParam={user_id}"
 
-    # পাশাপাশি দুটি সার্ভার বাটন
     ad_kb = types.InlineKeyboardMarkup(row_width=2)
     btn_server1 = types.InlineKeyboardButton(text="▶️ Server 1 ⚡", web_app=types.WebAppInfo(url=server1_webapp_url))
     btn_server2 = types.InlineKeyboardButton(text="▶️ Server 2 ⚡", web_app=types.WebAppInfo(url=server2_webapp_url))
@@ -312,14 +837,12 @@ def video_ad_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (মিনি অ্যাপের ফায়ারবেজের সাথে সিঙ্ক)
+# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ট্যাক্স", "টাস্ক", "tasks", "task"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ট্যাক্স", "টাস্ক", "tasks"]))
 def task_dashboard_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
-    
-    # মিনি অ্যাপের completedTasksList পাথ পড়া
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
     all_tasks = get_all_tasks_from_db()
@@ -350,7 +873,6 @@ def task_dashboard_handler(message):
     pending_tasks_count = 0
     for task_id, task in all_tasks.items():
         if isinstance(task, dict):
-            # মিনি অ্যাপ বা বট যেখানেই আগে কমপ্লিট হোক না কেন, এখানে আর দেখাবে না
             if completed_tasks_list.get(str(task_id)) is True:
                 continue
 
@@ -367,27 +889,23 @@ def task_dashboard_handler(message):
     if pending_tasks_count == 0:
         bot.send_message(
             message.chat.id, 
-            "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন।", 
-            reply_markup=get_main_keyboard()
+            "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন。", 
+            reply_markup=get_main_keyboard(user_id)
         )
     else:
         bot.send_message(message.chat.id, msg_text, reply_markup=task_kb, disable_web_page_preview=True)
 
-# =================================================================
-# ৫. ট্যাক্স ভেরিফাই Callback Query (দুইবার বোনাস নেওয়া ব্লক করার ইঞ্জিন)
-# =================================================================
+# টাস্ক ভেরিফাই Callback
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
 def verify_task_callback(call):
     user_id = str(call.from_user.id)
     task_id = call.data.replace("verify_", "")
 
-    # ফ্রেশ ডাটা আনা
     user_data = get_user_from_db(user_id) or {}
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
-    # চেক: মিনি অ্যাপ বা বট থেকে আগে সম্পন্ন হয়েছে কি না
     if completed_tasks_list.get(str(task_id)) is True:
-        bot.answer_callback_query(call.id, "⚠️ আপনি এই ট্যাক্সটি অ্যাপ অথবা বট থেকে আগেই সম্পূর্ণ করেছেন!", show_alert=True)
+        bot.answer_callback_query(call.id, "⚠️ আপনি এই ট্যাক্সটি আগেই সম্পূর্ণ করেছেন!", show_alert=True)
         return
 
     tasks = get_all_tasks_from_db()
@@ -403,21 +921,18 @@ def verify_task_callback(call):
 
     channel_username = extract_telegram_username(task_link)
     
-    # টেলিগ্রাম চ্যানেল হলে মেম্বারশিপ যাচাই
     if channel_username:
         is_member = verify_telegram_membership(channel_username, user_id)
         if not is_member:
             bot.answer_callback_query(call.id, "❌ আপনি এখনো চ্যানেলে জয়েন করেননি! আগে জয়েন করুন, তারপর ভেরিফাই বাটনে চাপুন।", show_alert=True)
             return
 
-    # ব্যালেন্স ও টাস্ক কাউন্ট আপডেট
     cur_bal = float(user_data.get("balance", 0.0))
     cur_tasks_count = int(user_data.get("completedTasksCount", 0))
 
     new_balance = cur_bal + task_reward
     new_tasks_count = cur_tasks_count + 1
 
-    # Firebase-এ মিনি অ্যাপের ফরম্যাটে সেভ (যাতে মিনি অ্যাপেও Claimed হয়ে যায়)
     update_user_in_db(user_id, {
         "balance": new_balance,
         "completedTasksCount": new_tasks_count,
@@ -437,7 +952,7 @@ def verify_task_callback(call):
     bot.send_message(call.message.chat.id, success_text)
 
 # =================================================================
-# ৬. ব্যালেন্স বাটন হ্যান্ডলার
+# ৫. ব্যালেন্স বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ব্যালেন্স", "balance", "/balance"]))
 def balance_handler(message):
@@ -470,7 +985,7 @@ def balance_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
 # =================================================================
-# ৭. রেফার বাটন হ্যান্ডলার
+# ৬. রেফার বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["রেফার", "refer", "/refer"]))
 def refer_handler(message):
@@ -505,7 +1020,7 @@ def refer_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৮. সাপোর্ট বাটন হ্যান্ডলার
+# ৭. সাপোর্ট বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["সাপোর্ট", "support", "/support"]))
 def support_handler(message):
@@ -525,14 +1040,15 @@ def support_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
 
 # =================================================================
-# ৯. ব্যাক বাটন হ্যান্ডলার
+# ৮. সাধারণ ব্যাক বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["ব্যাক", "back", "/back", "মেন্যু"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🔙 ব্যাক", "ব্যাক", "back", "মেন্যু"]))
 def back_to_main_menu(message):
-    bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard())
+    user_id = str(message.from_user.id)
+    bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 🚀 মেইন রানার
+# 🚀 মেইন ইঞ্জিন রানার
 # =================================================================
 if __name__ == "__main__":
     print("🌐 Keep-Alive Server চালু হচ্ছে...")
@@ -540,5 +1056,5 @@ if __name__ == "__main__":
     server_thread.daemon = True
     server_thread.start()
 
-    print("✅ MH Earning Bot Ultra Engine সফলভাবে চালু হয়েছে...")
+    print("✅ MH Earning Bot Ultra Pro Engine সফলভাবে চালু হয়েছে...")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)

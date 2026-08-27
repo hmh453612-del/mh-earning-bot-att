@@ -16,7 +16,8 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
+# ✅ নতুন ফায়ারবেস ডেটাবেস URL যুক্ত করা হয়েছে
+FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
 
 # 👑 শুধুমাত্র এই আইডিটিই একমাত্র অ্যাডমিন এক্সেস পাবে (অন্য কেউ পাবে না)
 ADMIN_IDS = ["8855522653"]

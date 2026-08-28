@@ -16,10 +16,10 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-# ✅ আপনার HTML/User App ফাইলের সাথে মিল রেখে লাইভ Firebase Realtime DB URL
+# ✅ লাইভ Firebase Realtime DB URL
 FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# 👑 অ্যাডমিন এক্সেস আইডি (শুধুমাত্র এই আইডিটিই অ্যাক্সেস পাবে)
+# 👑 অ্যাডমিন এক্সেস আইডি
 ADMIN_IDS = ["8855522653"]
 
 AD_REWARD = 10.00
@@ -263,7 +263,6 @@ def get_main_keyboard(user_id=None):
     keyboard.row(btn_refer, btn_leaderboard)
     keyboard.row(btn_support)
 
-    # শুধুমাত্র অ্যাডমিন 8855522653 এর জন্য Admin Panel বাটন আসবে
     if user_id and is_admin(user_id):
         btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
         keyboard.row(btn_admin)
@@ -786,7 +785,7 @@ def handle_tx_decision(call):
 # =================================================================
 # ২. কাজের বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["💼 কাজ ⚡", "কাজ", "work", "task", "/কাজ", "/task", "/work"]))
+@bot.message_handler(func=lambda msg: msg.text == "💼 কাজ ⚡")
 def work_options_handler(message):
     reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -802,7 +801,7 @@ def work_options_handler(message):
 # =================================================================
 # ৩. ভিডিও এড দেখুন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🎬 ভিডিও এড দেখুন", "ভিডিও", "video", "/video", "এড"]))
+@bot.message_handler(func=lambda msg: msg.text == "🎬 ভিডিও এড দেখুন")
 def video_ad_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -837,7 +836,7 @@ def video_ad_handler(message):
 # =================================================================
 # ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["📋 ট্যাক্স সম্পূর্ণ করুন", "ট্যাক্স", "টাস্ক", "tasks"]))
+@bot.message_handler(func=lambda msg: msg.text == "📋 ট্যাক্স সম্পূর্ণ করুন")
 def task_dashboard_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -952,7 +951,7 @@ def verify_task_callback(call):
 # =================================================================
 # ৫. ব্যালেন্স বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["💰 ব্যালেন্স 💎", "ব্যালেন্স", "balance", "/balance"]))
+@bot.message_handler(func=lambda msg: msg.text in ["💰 ব্যালেন্স 💎", "/balance"])
 def balance_handler(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name or "User"
@@ -983,9 +982,9 @@ def balance_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
 # =================================================================
-# ৬. রেফার বাটন হ্যান্ডলার
+# ৬. রেফার বাটন হ্যান্ডলার (শুধু ইনভাইট ও রেফার লিংক শেয়ার)
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 রেফার 🎁", "রেফার", "refer", "/refer"]))
+@bot.message_handler(func=lambda msg: msg.text in ["👥 রেফার 🎁", "/refer"])
 def refer_handler(message):
     user_id = str(message.from_user.id)
     referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
@@ -1018,11 +1017,11 @@ def refer_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# 🏆 লিডারবোর্ড মেন্যু ও সাব-মেন্যু হ্যান্ডলারসমূহ (পরপর লাইনে সাজানো)
+# 🏆 লিডারবোর্ড সাব-মেন্যু ওপেন বাটন
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 লিডারবোর্ড", "/🏆 লিডারবোর্ড", "লিডারবোর্ড", "leaderboard", "/leaderboard"]))
+@bot.message_handler(func=lambda msg: msg.text in ["🏆 লিডারবোর্ড", "/leaderboard"])
 def leaderboard_menu_handler(message):
-    """লিডারবোর্ড মেন্যুর সাব-কিবোর্ড প্রদর্শন"""
+    """🏆 লিডারবোর্ড বাটনে চাপ দিলে ৩টি সাব-বাটন কিবোর্ড আসবে"""
     text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং হাব</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
@@ -1034,8 +1033,10 @@ def leaderboard_menu_handler(message):
 👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
-# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (পরপর লাইনে: নাম এবং পাশে রেফার সংখ্যা)
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
+# =================================================================
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড হ্যান্ডলার
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
     # ফায়ারবেস থেকে লাইভ ইউজার ডাটা ফেচ
     all_users = get_all_users_from_db()
@@ -1047,7 +1048,7 @@ def top_10_leaderboard_handler(message):
             name = udata.get("name", "User")
             user_list.append({"id": uid, "name": name, "refs": refs})
 
-    # রেফার সংখ্যা অনুযায়ী সর্বোচ্চ থেকে ক্রমানুসারে সাজানো
+    # রেফার সংখ্যা অনুযায়ী বড় থেকে ছোট সাজানো
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
@@ -1058,7 +1059,7 @@ def top_10_leaderboard_handler(message):
         badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
         u_name = usr['name']
         ref_cnt = usr['refs']
-        # প্রতিটি লাইন: মেডেল/ক্রমিক + নাম — রেফার সংখ্যা
+        # একটার নিচে আরেকটা: মেডেল/ক্রমিক + নাম — রেফার সংখ্যা
         leader_lines.append(f"{badge} <b>{u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
 
     if not leader_lines:
@@ -1076,8 +1077,10 @@ def top_10_leaderboard_handler(message):
 
     bot.send_message(message.chat.id, res_msg)
 
-# ২. আমার রেফারেল (পরপর লাইনে: প্রথমে নাম এবং একবারে ডান কিনারায় তাদের ব্যালেন্স)
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "my refer"]))
+# =================================================================
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (নাম এবং একবারে ডান কিনারায় ব্যালেন্স)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
 def my_referrals_list_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
@@ -1147,7 +1150,7 @@ def my_referrals_list_handler(message):
 # =================================================================
 # ৭. সাপোর্ট বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🛠️ সাপোর্ট 💬", "সাপোর্ট", "support", "/support"]))
+@bot.message_handler(func=lambda msg: msg.text in ["🛠️ সাপোর্ট 💬", "/support"])
 def support_handler(message):
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
     btn_admin = types.InlineKeyboardButton(text="👨‍💻 এডমিন লাইভ সাপোর্ট 💬", url=f"https://t.me/{SUPPORT_USERNAME}")
@@ -1167,7 +1170,7 @@ def support_handler(message):
 # =================================================================
 # ৮. সাধারণ ব্যাক বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🔙 ব্যাক", "/🔙 ব্যাক", "ব্যাক", "back", "মেন্যু", "<-"]))
+@bot.message_handler(func=lambda msg: msg.text in ["🔙 ব্যাক", "/🔙 ব্যাক", "ব্যাক", "back", "মেন্যু", "<-"])
 def back_to_main_menu(message):
     user_id = str(message.from_user.id)
     bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))

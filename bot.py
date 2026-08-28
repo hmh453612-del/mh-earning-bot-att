@@ -16,10 +16,10 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-# ✅ আপনার ইউজার অ্যাপের লাইভ ফায়ারবেস ডেটাবেস URL
+# ✅ আপনার HTML/User App ফাইলের সাথে মিল রেখে লাইভ Firebase Realtime DB URL
 FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# 👑 অ্যাডমিন এক্সেস আইডি
+# 👑 অ্যাডমিন এক্সেস আইডি (শুধুমাত্র এই আইডিটিই অ্যাক্সেস পাবে)
 ADMIN_IDS = ["8855522653"]
 
 AD_REWARD = 10.00
@@ -251,7 +251,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 # ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
 # =================================================================
 def get_main_keyboard(user_id=None):
-    """সাধারণ ইউজার কিবোর্ড"""
+    """সাধারণ ইউজার কিবোর্ড (লিডারবোর্ড ও অ্যাডমিন বাটনসহ)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -263,6 +263,7 @@ def get_main_keyboard(user_id=None):
     keyboard.row(btn_refer, btn_leaderboard)
     keyboard.row(btn_support)
 
+    # শুধুমাত্র অ্যাডমিন 8855522653 এর জন্য Admin Panel বাটন আসবে
     if user_id and is_admin(user_id):
         btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
         keyboard.row(btn_admin)
@@ -281,7 +282,7 @@ def get_leaderboard_keyboard():
     return keyboard
 
 def get_admin_keyboard():
-    """👑 অ্যাডমিন কিবোর্ড মেন্যু"""
+    """👑 এক্সক্লুসিভ অ্যাডমিন কিবোর্ড মেন্যু"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
     btn_stats = types.KeyboardButton("📊 লাইভ ড্যাশবোর্ড")
@@ -1017,7 +1018,7 @@ def refer_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# 🏆 লিডারবোর্ড মেন্যু ও সাব-মেন্যু হ্যান্ডলারসমূহ
+# 🏆 লিডারবোর্ড মেন্যু ও সাব-মেন্যু হ্যান্ডলারসমূহ (পরপর লাইনে সাজানো)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 লিডারবোর্ড", "/🏆 লিডারবোর্ড", "লিডারবোর্ড", "leaderboard", "/leaderboard"]))
 def leaderboard_menu_handler(message):
@@ -1033,10 +1034,10 @@ def leaderboard_menu_handler(message):
 👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
-# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (নাম এবং পাশে রেফার সংখ্যা)
+# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (পরপর লাইনে: নাম এবং পাশে রেফার সংখ্যা)
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
 def top_10_leaderboard_handler(message):
-    # ফায়ারবেস থেকে সরাসরি লাইভ ইউজার ডাটা ফেচ
+    # ফায়ারবেস থেকে লাইভ ইউজার ডাটা ফেচ
     all_users = get_all_users_from_db()
 
     user_list = []
@@ -1046,7 +1047,7 @@ def top_10_leaderboard_handler(message):
             name = udata.get("name", "User")
             user_list.append({"id": uid, "name": name, "refs": refs})
 
-    # রেফার সংখ্যা অনুযায়ী বড় থেকে ছোট সাজানো
+    # রেফার সংখ্যা অনুযায়ী সর্বোচ্চ থেকে ক্রমানুসারে সাজানো
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
@@ -1057,8 +1058,8 @@ def top_10_leaderboard_handler(message):
         badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
         u_name = usr['name']
         ref_cnt = usr['refs']
-        # প্রতিটি ইউজারের নাম এবং পাশে সে কতজনকে রেফার করেছে
-        leader_lines.append(f"<b>{badge} {u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
+        # প্রতিটি লাইন: মেডেল/ক্রমিক + নাম — রেফার সংখ্যা
+        leader_lines.append(f"{badge} <b>{u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
 
     if not leader_lines:
         leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
@@ -1075,7 +1076,7 @@ def top_10_leaderboard_handler(message):
 
     bot.send_message(message.chat.id, res_msg)
 
-# ২. আমার রেফারেল (সদস্যের নাম এবং একবারে ডান কিনারায় তাদের ব্যালেন্স)
+# ২. আমার রেফারেল (পরপর লাইনে: প্রথমে নাম এবং একবারে ডান কিনারায় তাদের ব্যালেন্স)
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "my refer"]))
 def my_referrals_list_handler(message):
     user_id = str(message.from_user.id)
@@ -1109,7 +1110,7 @@ def my_referrals_list_handler(message):
             "joinedAt": joined_at
         })
 
-    # লেটেস্ট জয়েনিং ও ব্যালেন্স অনুযায়ী সাজানো
+    # ব্যালেন্স ও লেটেস্ট জয়েনিং অনুযায়ী সাজানো
     ref_items.sort(key=lambda x: (x["balance"], x["joinedAt"]), reverse=True)
     top_my_refs = ref_items[:10]
 
@@ -1127,17 +1128,17 @@ def my_referrals_list_handler(message):
     for idx, r in enumerate(top_my_refs, 1):
         u_name = r['name']
         bal = r['balance']
-        # ফরম্যাট: প্রথমে নাম এবং একবারে ডান কিনারায় ব্যালেন্স
-        line = f"<blockquote><b>{idx}. 👤 {u_name}</b> ──────── <b>৳ {bal:.2f}</b></blockquote>"
+        # প্রতিটি লাইন: ক্রমিক নম্বর + নাম ──────── ডান পাশে ব্যালেন্স
+        line = f"<b>{idx}. 👤 {u_name}</b> ──────── <b>৳ {bal:.2f}</b>"
         ref_lines.append(line)
 
     joined_list_str = "\n".join(ref_lines)
 
     my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা (টপ ১০)</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
+<blockquote>📊 <b>মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
 
-{joined_list_str}
+{joined_list_str}</blockquote>
 
 ⚡ <i>আপনার রেফারেল সদস্যদের রিয়েলটাইম লাইভ ব্যালেন্স প্রদর্শিত হচ্ছে!</i>"""
 

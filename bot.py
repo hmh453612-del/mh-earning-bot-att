@@ -16,7 +16,8 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-FIREBASE_DB_URL = "https://mh-earning-bot-default-rtdb.asia-southeast1.firebasedatabase.app"
+# ✅ আপনার HTML/User App ফাইলের সাথে হুবহু মিল রেখে Firebase URL আপডেট করা হয়েছে
+FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
 
 # 👑 শুধুমাত্র এই আইডিটিই একমাত্র অ্যাডমিন এক্সেস পাবে (অন্য কেউ পাবে না)
 ADMIN_IDS = ["8855522653"]
@@ -1053,7 +1054,7 @@ def leaderboard_menu_handler(message):
 # ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
 def top_10_leaderboard_handler(message):
-    # লাইভ ফায়ারবেস থেকে সব ইউজার কল করা হচ্ছে
+    # ফায়ারবেস থেকে সরাসরি লাইভ ইউজার ডাটা ফেচ
     all_users = get_all_users_from_db()
 
     user_list = []
@@ -1064,7 +1065,7 @@ def top_10_leaderboard_handler(message):
             bal = float(udata.get("balance", 0.0))
             user_list.append({"id": uid, "name": name, "refs": refs, "balance": bal})
 
-    # রেফার সংখ্যা অনুযায়ী ক্রমানুসারে সাজানো (Descending Order)
+    # রেফার সংখ্যা অনুযায়ী বড় থেকে ছোট সাজানো
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
@@ -1093,14 +1094,13 @@ def top_10_leaderboard_handler(message):
 
     bot.send_message(message.chat.id, res_msg)
 
-# ২. আমার রেফারেল (১০ জন রেফার ব্যক্তি, তাদের রেফার সংখ্যা ও ডান পাশে ব্যালেন্স)
+# ২. আমার রেফারেল (১০ জন রেফার সদস্য, তাদের রেফার সংখ্যা ও ডান পাশে ব্যালেন্স)
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "my refer"]))
 def my_referrals_list_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
     total_refs_count = int(user_data.get("referrals", 0))
 
-    # লাইভ ফায়ারবেস থেকে ইউজারের রেফারেল তালিকা আনা
     try:
         ref_url = f"{FIREBASE_DB_URL}/users/{user_id}/myReferrals.json"
         res = requests.get(ref_url, timeout=5)
@@ -1110,13 +1110,11 @@ def my_referrals_list_handler(message):
 
     all_users = get_all_users_from_db()
 
-    # যদি myReferrals খালি থাকে, গ্লোবাল ইউজার ডাটাবেজ থেকে ম্যাচ করা
     if not my_refs_dict:
         my_refs_dict = {uid: u for uid, u in all_users.items() if isinstance(u, dict) and str(u.get("referredBy")) == user_id}
 
     ref_items = []
     for ref_uid, v in my_refs_dict.items():
-        # লাইভ ফায়ারবেস থেকে রেফারকারীর বর্তমান লেটেস্ট ডাটা নেওয়া
         live_ref_user = all_users.get(str(ref_uid), {}) if isinstance(all_users, dict) else {}
         
         name = live_ref_user.get("name") or (v.get("name") if isinstance(v, dict) else "User")
@@ -1132,7 +1130,7 @@ def my_referrals_list_handler(message):
             "joinedAt": joined_at
         })
 
-    # তাদের মধ্য থেকে সর্বোচ্চ রেফারেল করা অনুযায়ী অথবা যুক্ত হওয়ার সময় অনুযায়ী সাজানো
+    # রেফারেল সদস্যের নিজস্ব রেফার সংখ্যা অনুযায়ী সাজানো
     ref_items.sort(key=lambda x: (x["sub_refs"], x["joinedAt"]), reverse=True)
     top_my_refs = ref_items[:10]
 
@@ -1151,7 +1149,6 @@ def my_referrals_list_handler(message):
         u_name = r['name']
         s_refs = r['sub_refs']
         bal = r['balance']
-        # ফরম্যাট: নাম | রেফার সংখ্যা | ডান পাশে ব্যালেন্স
         line = f"<blockquote><b>{idx}. 👤 {u_name}</b>\n   ├ 👥 রেফার করেছে: <b>{s_refs} জন</b>\n   └ 💵 ব্যালেন্স: <b>৳ {bal:.2f}</b></blockquote>"
         ref_lines.append(line)
 

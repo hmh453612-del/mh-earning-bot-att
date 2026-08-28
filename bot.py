@@ -255,7 +255,7 @@ def get_main_keyboard(user_id=None):
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
     btn_refer = types.KeyboardButton("👥 রেফার 🎁")
-    btn_leaderboard = types.KeyboardButton("🏆 লিডারবোর্ড 🥇")
+    btn_leaderboard = types.KeyboardButton("🏆 লিডারবোর্ড")
     btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
 
     keyboard.row(btn_task, btn_balance)
@@ -270,10 +270,10 @@ def get_main_keyboard(user_id=None):
     return keyboard
 
 def get_leaderboard_keyboard():
-    """🏆 লিডারবোর্ড সাব-মেন্যু কিবোর্ড"""
+    """🏆 লিডারবোর্ড সাব-মেন্যু কিবোর্ড (৩টি বাটন)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_top10 = types.KeyboardButton("🏆 টপ ১০ লিডারবোর্ড")
-    btn_my_refs = types.KeyboardButton("👥 আমার রেফারেল তালিকা")
+    btn_my_refs = types.KeyboardButton("👥 আমার রেফারেল")
     btn_back = types.KeyboardButton("🔙 ব্যাক")
 
     keyboard.row(btn_top10, btn_my_refs)
@@ -1034,24 +1034,26 @@ def refer_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
 
 # =================================================================
-# 🏆 লিডারবোর্ড মেন্যু ও সাব-মেন্যু হ্যান্ডলারসমূহ (নতুন আপডেট)
+# 🏆 লিডারবোর্ড মেন্যু ও সাব-মেন্যু হ্যান্ডলারসমূহ
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 লিডারবোর্ড 🥇", "লিডারবোর্ড", "leaderboard", "/leaderboard"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 লিডারবোর্ড", "/🏆 লিডারবোর্ড", "লিডারবোর্ড", "leaderboard", "/leaderboard"]))
 def leaderboard_menu_handler(message):
-    """লিডারবোর্ড মেন্যু ওপেন করা"""
-    text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং জোন</b>
+    """লিডারবোর্ড মেন্যুর সাব-কিবোর্ড প্রদর্শন"""
+    text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং হাব</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত জানতে নিচের যেকোনো অপশনে চাপ দিন:</i>
+<blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
 
-🥇 <b>টপ ১০ লিডারবোর্ড:</b> সর্বোচ্চ রেফারকারীদের গ্লোবাল তালিকা
-👥 <b>আমার রেফারেল তালিকা:</b> আপনার আমন্ত্রণে যুক্ত হওয়া টপ সদস্যদের লিস্ট</blockquote>
+🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> ফায়ারবেস থেকে সরাসরি টপ ১০ রেফারকারী মেম্বারদের লাইভ তালিকা
+👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা শীর্ষ ১০ জনের নাম, তাদের রেফার সংখ্যা ও ওয়ালেট ব্যালেন্স
+🔙 <b>/🔙 ব্যাক:</b> পূর্ববর্তী মূল মেন্যুতে ফিরে যান</blockquote>
 
-👇 <i>নিচের কিবোর্ড থেকে অপশন নির্বাচন করুন:</i>"""
+👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
-# গ্লোবাল টপ ১০ রেফার লিডারবোর্ড
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
+# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
 def top_10_leaderboard_handler(message):
+    # লাইভ ফায়ারবেস থেকে সব ইউজার কল করা হচ্ছে
     all_users = get_all_users_from_db()
 
     user_list = []
@@ -1059,9 +1061,10 @@ def top_10_leaderboard_handler(message):
         if isinstance(udata, dict):
             refs = int(udata.get("referrals", 0))
             name = udata.get("name", "User")
-            user_list.append({"id": uid, "name": name, "refs": refs})
+            bal = float(udata.get("balance", 0.0))
+            user_list.append({"id": uid, "name": name, "refs": refs, "balance": bal})
 
-    # রেফার সংখ্যা অনুযায়ী সাজানো (Descending order)
+    # রেফার সংখ্যা অনুযায়ী ক্রমানুসারে সাজানো (Descending Order)
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
@@ -1072,30 +1075,32 @@ def top_10_leaderboard_handler(message):
         badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
         u_name = usr['name']
         ref_cnt = usr['refs']
-        leader_lines.append(f"{badge} <b>{u_name}</b> — <b>{ref_cnt}</b> টি রেফার")
+        bal = usr['balance']
+        leader_lines.append(f"{badge} <b>{u_name}</b>\n   ├ 👥 রেফার: <b>{ref_cnt} জন</b>\n   └ 💰 ব্যালেন্স: <b>৳ {bal:.2f}</b>")
 
     if not leader_lines:
-        leader_lines.append("<i>এখনো কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
+        leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
 
-    top_text = "\n".join(leader_lines)
+    top_text = "\n\n".join(leader_lines)
 
-    res_msg = f"""🏆 <b>গ্লোবাল টপ ১০ রেফার লিডারবোর্ড</b> 🌟
+    res_msg = f"""🏆 <b>লাইভ টপ ১০ রেফার চ্যাম্পিয়ন লিডারবোর্ড</b> 🌟
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>👑 <b>সেরা ১০ জন চ্যাম্পিয়ন মেম্বার:</b>
+<blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্যের তালিকা:</b>
 
 {top_text}</blockquote>
 
-🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন বিশেষ সম্মাননা ও রিওয়ার্ড!</i>"""
+🚀 <i>বেশি বেশি বন্ধুদের ইনভাইট করে লিডারবোর্ডের শীর্ষে উঠে আসুন এবং নিশ্চিত আকর্ষণীয় রিওয়ার্ড জিতুন!</i>"""
 
     bot.send_message(message.chat.id, res_msg)
 
-# নিজের রেফারেল তালিকা (টপ ১০)
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল তালিকা", "আমার রেফার"]))
+# ২. আমার রেফারেল (১০ জন রেফার ব্যক্তি, তাদের রেফার সংখ্যা ও ডান পাশে ব্যালেন্স)
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "my refer"]))
 def my_referrals_list_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
     total_refs_count = int(user_data.get("referrals", 0))
 
+    # লাইভ ফায়ারবেস থেকে ইউজারের রেফারেল তালিকা আনা
     try:
         ref_url = f"{FIREBASE_DB_URL}/users/{user_id}/myReferrals.json"
         res = requests.get(ref_url, timeout=5)
@@ -1103,51 +1108,62 @@ def my_referrals_list_handler(message):
     except Exception:
         my_refs_dict = {}
 
+    all_users = get_all_users_from_db()
+
+    # যদি myReferrals খালি থাকে, গ্লোবাল ইউজার ডাটাবেজ থেকে ম্যাচ করা
     if not my_refs_dict:
-        # ফলব্যাক: পুরো ইউজার ডাটাবেজ থেকে যদি কেউ referredBy হিসেবে এই আইডি বহন করে
-        all_users = get_all_users_from_db()
         my_refs_dict = {uid: u for uid, u in all_users.items() if isinstance(u, dict) and str(u.get("referredBy")) == user_id}
 
     ref_items = []
-    for k, v in my_refs_dict.items():
-        if isinstance(v, dict):
-            j_date = "N/A"
-            if v.get("joinedAt"):
-                j_date = datetime.fromtimestamp(v.get("joinedAt")/1000).strftime('%d/%m/%Y %I:%M %p')
-            ref_items.append({
-                "name": v.get("name", "User"),
-                "id": str(v.get("id", k)),
-                "date": j_date,
-                "timestamp": v.get("joinedAt", 0)
-            })
+    for ref_uid, v in my_refs_dict.items():
+        # লাইভ ফায়ারবেস থেকে রেফারকারীর বর্তমান লেটেস্ট ডাটা নেওয়া
+        live_ref_user = all_users.get(str(ref_uid), {}) if isinstance(all_users, dict) else {}
+        
+        name = live_ref_user.get("name") or (v.get("name") if isinstance(v, dict) else "User")
+        sub_refs = int(live_ref_user.get("referrals", 0))
+        balance = float(live_ref_user.get("balance", 0.0))
+        joined_at = live_ref_user.get("joinedAt") or (v.get("joinedAt") if isinstance(v, dict) else 0)
 
-    # লেটেস্ট অনুযায়ী ক্রমানুসারে সাজানো
-    ref_items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        ref_items.append({
+            "id": str(ref_uid),
+            "name": name,
+            "sub_refs": sub_refs,
+            "balance": balance,
+            "joinedAt": joined_at
+        })
+
+    # তাদের মধ্য থেকে সর্বোচ্চ রেফারেল করা অনুযায়ী অথবা যুক্ত হওয়ার সময় অনুযায়ী সাজানো
+    ref_items.sort(key=lambda x: (x["sub_refs"], x["joinedAt"]), reverse=True)
     top_my_refs = ref_items[:10]
 
     if not top_my_refs:
-        no_ref_text = f"""👥 <b>আমার ব্যক্তিগত রেফারেল লিস্ট</b>
+        no_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>📊 <b>সর্বমোট রেফারেল:</b> <b>০ জন</b>
-❌ <i>আপনি এখনো কাউকে রেফার করেননি!</i></blockquote>
+<blockquote>📊 <b>আপনার মোট রেফার:</b> <b>০ জন</b>
+❌ <i>আপনি এখনো কাউকে সফলভাবে রেফার করেননি!</i></blockquote>
 
-👉 <i>বন্ধুদের রেফার লিংক শেয়ার করে এখনই ৫০ টাকা করে বোনাস আয় করুন!</i>"""
+👉 <i>রেফার বাটনে গিয়ে লিংক কপি করে বন্ধুদের সাথে শেয়ার করুন এবং প্রতিটি রেফারে ৫০ টাকা করে বোনাস আয় করুন!</i>"""
         bot.send_message(message.chat.id, no_ref_text)
         return
 
     ref_lines = []
     for idx, r in enumerate(top_my_refs, 1):
-        ref_lines.append(f"{idx}. 👤 <b>{r['name']}</b> (<code>{r['id']}</code>)\n   📅 <i>{r['date']}</i>")
+        u_name = r['name']
+        s_refs = r['sub_refs']
+        bal = r['balance']
+        # ফরম্যাট: নাম | রেফার সংখ্যা | ডান পাশে ব্যালেন্স
+        line = f"<blockquote><b>{idx}. 👤 {u_name}</b>\n   ├ 👥 রেফার করেছে: <b>{s_refs} জন</b>\n   └ 💵 ব্যালেন্স: <b>৳ {bal:.2f}</b></blockquote>"
+        ref_lines.append(line)
 
-    joined_list_str = "\n\n".join(ref_lines)
+    joined_list_str = "\n".join(ref_lines)
 
-    my_ref_text = f"""👥 <b>আমার ব্যক্তিগত রেফারেল লিস্ট (টপ ১০)</b>
+    my_ref_text = f"""👥 <b>আমার রেফারেল টিম (টপ ১০ সদস্য)</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>📊 <b>সর্বমোট সফল রেফার:</b> <b>{total_refs_count} জন</b>
+📊 <b>আপনার মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
 
-{joined_list_str}</blockquote>
+{joined_list_str}
 
-💎 <i>প্রতি সফল রেফারে সরাসরি মূল ওয়ালেটে বোনাস যোগ হচ্ছে!</i>"""
+⚡ <i>আপনার রেফারে জয়েন করা প্রতিটি সদস্যের লাইভ ডাটা এখানে প্রদর্শিত হচ্ছে!</i>"""
 
     bot.send_message(message.chat.id, my_ref_text)
 
@@ -1174,7 +1190,7 @@ def support_handler(message):
 # =================================================================
 # ৮. সাধারণ ব্যাক বাটন হ্যান্ডলার
 # =================================================================
-@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🔙 ব্যাক", "ব্যাক", "back", "মেন্যু", "<-"]))
+@bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🔙 ব্যাক", "/🔙 ব্যাক", "ব্যাক", "back", "মেন্যু", "<-"]))
 def back_to_main_menu(message):
     user_id = str(message.from_user.id)
     bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))

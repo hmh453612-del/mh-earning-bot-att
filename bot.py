@@ -16,10 +16,10 @@ BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
 SUPPORT_USERNAME = "mh_earning_bot_admin"
 
-# ✅ আপনার HTML/User App ফাইলের সাথে হুবহু মিল রেখে Firebase URL আপডেট করা হয়েছে
+# ✅ আপনার ইউজার অ্যাপের লাইভ ফায়ারবেস ডেটাবেস URL
 FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-# 👑 শুধুমাত্র এই আইডিটিই একমাত্র অ্যাডমিন এক্সেস পাবে (অন্য কেউ পাবে না)
+# 👑 অ্যাডমিন এক্সেস আইডি
 ADMIN_IDS = ["8855522653"]
 
 AD_REWARD = 10.00
@@ -48,7 +48,7 @@ def run_web_server():
 # 🛡️ পারমিশন ও ফায়ারবেস ইঞ্জিন
 # =================================================================
 def is_admin(user_id):
-    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা (শুধুমাত্র 8855522653 অনুমোদিত)"""
+    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা"""
     return str(user_id).strip() in ADMIN_IDS
 
 def get_user_from_db(user_id):
@@ -251,7 +251,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 # ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
 # =================================================================
 def get_main_keyboard(user_id=None):
-    """সাধারণ ইউজার কিবোর্ড (লিডারবোর্ড ও অ্যাডমিন বাটনসহ)"""
+    """সাধারণ ইউজার কিবোর্ড"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -263,7 +263,6 @@ def get_main_keyboard(user_id=None):
     keyboard.row(btn_refer, btn_leaderboard)
     keyboard.row(btn_support)
 
-    # শুধুমাত্র 8855522653 আইডিটিই এই বাটনটি দেখতে পারবে
     if user_id and is_admin(user_id):
         btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
         keyboard.row(btn_admin)
@@ -282,7 +281,7 @@ def get_leaderboard_keyboard():
     return keyboard
 
 def get_admin_keyboard():
-    """👑 এক্সক্লুসিভ অ্যাডমিন কিবোর্ড মেন্যু"""
+    """👑 অ্যাডমিন কিবোর্ড মেন্যু"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
     btn_stats = types.KeyboardButton("📊 লাইভ ড্যাশবোর্ড")
@@ -391,8 +390,6 @@ def admin_panel_open(message):
 # =================================================================
 # 👑 অ্যাডমিন কিবোর্ড বাটন হ্যান্ডলারসমূহ
 # =================================================================
-
-# ১. লাইভ ড্যাশবোর্ড
 @bot.message_handler(func=lambda msg: msg.text == "📊 লাইভ ড্যাশবোর্ড")
 def admin_dashboard_handler(message):
     user_id = str(message.from_user.id)
@@ -423,7 +420,6 @@ def admin_dashboard_handler(message):
 
     bot.send_message(message.chat.id, stats_text)
 
-# ২. উইথড্র রিকোয়েস্ট
 @bot.message_handler(func=lambda msg: msg.text == "💸 উইথড্র রিকোয়েস্ট")
 def admin_withdraws_handler(message):
     user_id = str(message.from_user.id)
@@ -455,7 +451,6 @@ def admin_withdraws_handler(message):
         )
         bot.send_message(message.chat.id, w_text, reply_markup=kb)
 
-# ৩. অ্যাপ সেটিংস
 @bot.message_handler(func=lambda msg: msg.text == "⚙️ অ্যাপ সেটিংস")
 def admin_settings_menu_handler(message):
     user_id = str(message.from_user.id)
@@ -485,7 +480,6 @@ def admin_settings_menu_handler(message):
     )
     bot.send_message(message.chat.id, settings_text, reply_markup=kb)
 
-# ৪. ব্যালেন্স পরিবর্তন
 @bot.message_handler(func=lambda msg: msg.text == "💰 ব্যালেন্স পরিবর্তন")
 def admin_balance_edit_handler(message):
     user_id = str(message.from_user.id)
@@ -495,7 +489,6 @@ def admin_balance_edit_handler(message):
     msg = bot.send_message(message.chat.id, "👤 যে ইউজারের ব্যালেন্স পরিবর্তন করতে চান তার <b>Telegram ID</b> লিখুন:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ৫. নতুন টাস্ক যুক্ত
 @bot.message_handler(func=lambda msg: msg.text == "➕ নতুন টাস্ক যুক্ত")
 def admin_add_task_step1(message):
     user_id = str(message.from_user.id)
@@ -505,7 +498,6 @@ def admin_add_task_step1(message):
     msg = bot.send_message(message.chat.id, "📝 <b>টাস্কের নাম বা টাইটেল দিন:</b>\n<i>(যেমন: Join Telegram Channel)</i>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ৬. টাস্ক ম্যানেজমেন্ট
 @bot.message_handler(func=lambda msg: msg.text == "📋 টাস্ক ম্যানেজমেন্ট")
 def admin_manage_tasks_handler(message):
     user_id = str(message.from_user.id)
@@ -522,12 +514,10 @@ def admin_manage_tasks_handler(message):
             t_text = f"""🔹 <b>{t.get('title')}</b>
 💰 <b>রিওয়ার্ড:</b> ৳ {float(t.get('reward', 0)):.2f}
 🔗 <b>লিংক:</b> {t.get('link')}"""
-            
             kb = types.InlineKeyboardMarkup()
             kb.add(types.InlineKeyboardButton("🗑️ এই টাস্কটি মুছে ফেলুন", callback_data=f"del_task_{tid}"))
             bot.send_message(message.chat.id, t_text, reply_markup=kb, disable_web_page_preview=True)
 
-# ৭. ইউজার তথ্য খুঁজুন
 @bot.message_handler(func=lambda msg: msg.text == "🔍 ইউজার তথ্য খুঁজুন")
 def admin_search_user_handler(message):
     user_id = str(message.from_user.id)
@@ -537,7 +527,6 @@ def admin_search_user_handler(message):
     msg = bot.send_message(message.chat.id, "🔍 যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b> পাঠান:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ৮. অল ব্রডকাস্ট
 @bot.message_handler(func=lambda msg: msg.text == "📢 অল ব্রডকাস্ট")
 def admin_broadcast_prompt(message):
     user_id = str(message.from_user.id)
@@ -547,7 +536,6 @@ def admin_broadcast_prompt(message):
     msg = bot.send_message(message.chat.id, "📢 সব ইউজারের কাছে যে মেসেজটি পাঠাতে চান তা লিখুন (HTML ফরম্যাট সমর্থিত):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ৯. ইউজার মেন্যুতে ব্যাক
 @bot.message_handler(func=lambda msg: msg.text == "🏠 ইউজার মেন্যুতে যান")
 def admin_back_to_user_menu(message):
     user_id = str(message.from_user.id)
@@ -566,7 +554,6 @@ def process_admin_input(message):
         bot.send_message(message.chat.id, "❌ অপারেশন বাতিল করা হয়েছে।", reply_markup=get_admin_keyboard())
         return
 
-    # সেটিংস চেঞ্জ
     if state == "adm_set_adreward":
         try:
             val = float(text)
@@ -603,7 +590,6 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ সঠিক পূর্ণসংখ্যা দিন!")
         admin_states.pop(user_id, None)
 
-    # ব্যালেন্স পরিবর্তন
     elif state == "adm_edit_bal_user":
         target_uid = text
         u_data = get_user_from_db(target_uid)
@@ -635,7 +621,6 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ সঠিক টাকার পরিমাণ দিন!")
         admin_states.pop(user_id, None)
 
-    # নতুন টাস্ক যুক্ত উইজার্ড
     elif state == "adm_task_title":
         admin_states[user_id] = f"adm_task_reward|{text}"
         msg = bot.send_message(message.chat.id, f"💰 <b>'{text}'</b> টাস্কটির জন্য কত টাকা রিওয়ার্ড দিতে চান? (যেমন: 5.00)")
@@ -669,7 +654,6 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন।", reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # ইউজার সার্চ
     elif state == "adm_search_user":
         target_uid = text
         u_data = get_user_from_db(target_uid)
@@ -693,7 +677,6 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # অল ব্রডকাস্ট
     elif state == "adm_broadcast_msg":
         broadcast_text = text
         all_users = get_all_users_from_db()
@@ -750,7 +733,6 @@ def admin_delete_task(call):
     else:
         bot.answer_callback_query(call.id, "❌ টাস্ক মুছতে সমস্যা হয়েছে!", show_alert=True)
 
-# উইথড্র রিকোয়েস্ট Approve / Reject
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tx_app_") or call.data.startswith("tx_rej_"))
 def handle_tx_decision(call):
     user_id = str(call.from_user.id)
@@ -1044,14 +1026,14 @@ def leaderboard_menu_handler(message):
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
 
-🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> ফায়ারবেস থেকে সরাসরি টপ ১০ রেফারকারী মেম্বারদের লাইভ তালিকা
-👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা শীর্ষ ১০ জনের নাম, তাদের রেফার সংখ্যা ও ওয়ালেট ব্যালেন্স
+🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> শীর্ষ ১০ জন রেফারকারীর নাম ও তাদের রেফার সংখ্যা
+👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা সদস্যদের নাম ও ডান পাশে তাদের ব্যালেন্স
 🔙 <b>/🔙 ব্যাক:</b> পূর্ববর্তী মূল মেন্যুতে ফিরে যান</blockquote>
 
 👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
-# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড
+# ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (নাম এবং পাশে রেফার সংখ্যা)
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"]))
 def top_10_leaderboard_handler(message):
     # ফায়ারবেস থেকে সরাসরি লাইভ ইউজার ডাটা ফেচ
@@ -1062,8 +1044,7 @@ def top_10_leaderboard_handler(message):
         if isinstance(udata, dict):
             refs = int(udata.get("referrals", 0))
             name = udata.get("name", "User")
-            bal = float(udata.get("balance", 0.0))
-            user_list.append({"id": uid, "name": name, "refs": refs, "balance": bal})
+            user_list.append({"id": uid, "name": name, "refs": refs})
 
     # রেফার সংখ্যা অনুযায়ী বড় থেকে ছোট সাজানো
     user_list.sort(key=lambda x: x["refs"], reverse=True)
@@ -1076,25 +1057,25 @@ def top_10_leaderboard_handler(message):
         badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
         u_name = usr['name']
         ref_cnt = usr['refs']
-        bal = usr['balance']
-        leader_lines.append(f"{badge} <b>{u_name}</b>\n   ├ 👥 রেফার: <b>{ref_cnt} জন</b>\n   └ 💰 ব্যালেন্স: <b>৳ {bal:.2f}</b>")
+        # প্রতিটি ইউজারের নাম এবং পাশে সে কতজনকে রেফার করেছে
+        leader_lines.append(f"<b>{badge} {u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
 
     if not leader_lines:
         leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
 
-    top_text = "\n\n".join(leader_lines)
+    top_text = "\n".join(leader_lines)
 
-    res_msg = f"""🏆 <b>লাইভ টপ ১০ রেফার চ্যাম্পিয়ন লিডারবোর্ড</b> 🌟
+    res_msg = f"""🏆 <b>টপ ১০ রেফার লিডারবোর্ড</b> 🌟
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্যের তালিকা:</b>
+<blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্য:</b>
 
 {top_text}</blockquote>
 
-🚀 <i>বেশি বেশি বন্ধুদের ইনভাইট করে লিডারবোর্ডের শীর্ষে উঠে আসুন এবং নিশ্চিত আকর্ষণীয় রিওয়ার্ড জিতুন!</i>"""
+🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন বিশেষ সম্মাননা ও রিওয়ার্ড!</i>"""
 
     bot.send_message(message.chat.id, res_msg)
 
-# ২. আমার রেফারেল (১০ জন রেফার সদস্য, তাদের রেফার সংখ্যা ও ডান পাশে ব্যালেন্স)
+# ২. আমার রেফারেল (সদস্যের নাম এবং একবারে ডান কিনারায় তাদের ব্যালেন্স)
 @bot.message_handler(func=lambda msg: msg.text and any(w in msg.text for w in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "my refer"]))
 def my_referrals_list_handler(message):
     user_id = str(message.from_user.id)
@@ -1118,49 +1099,47 @@ def my_referrals_list_handler(message):
         live_ref_user = all_users.get(str(ref_uid), {}) if isinstance(all_users, dict) else {}
         
         name = live_ref_user.get("name") or (v.get("name") if isinstance(v, dict) else "User")
-        sub_refs = int(live_ref_user.get("referrals", 0))
         balance = float(live_ref_user.get("balance", 0.0))
         joined_at = live_ref_user.get("joinedAt") or (v.get("joinedAt") if isinstance(v, dict) else 0)
 
         ref_items.append({
             "id": str(ref_uid),
             "name": name,
-            "sub_refs": sub_refs,
             "balance": balance,
             "joinedAt": joined_at
         })
 
-    # রেফারেল সদস্যের নিজস্ব রেফার সংখ্যা অনুযায়ী সাজানো
-    ref_items.sort(key=lambda x: (x["sub_refs"], x["joinedAt"]), reverse=True)
+    # লেটেস্ট জয়েনিং ও ব্যালেন্স অনুযায়ী সাজানো
+    ref_items.sort(key=lambda x: (x["balance"], x["joinedAt"]), reverse=True)
     top_my_refs = ref_items[:10]
 
     if not top_my_refs:
-        no_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা</b>
+        no_ref_text = f"""👥 <b>আমার রেফারেল তালিকা</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>📊 <b>আপনার মোট রেফার:</b> <b>০ জন</b>
-❌ <i>আপনি এখনো কাউকে সফলভাবে রেফার করেননি!</i></blockquote>
+❌ <i>আপনি এখনো কাউকে রেফার করেননি!</i></blockquote>
 
-👉 <i>রেফার বাটনে গিয়ে লিংক কপি করে বন্ধুদের সাথে শেয়ার করুন এবং প্রতিটি রেফারে ৫০ টাকা করে বোনাস আয় করুন!</i>"""
+👉 <i>রেফার লিংক শেয়ার করে এখনই ৫০ টাকা করে বোনাস আয় শুরু করুন!</i>"""
         bot.send_message(message.chat.id, no_ref_text)
         return
 
     ref_lines = []
     for idx, r in enumerate(top_my_refs, 1):
         u_name = r['name']
-        s_refs = r['sub_refs']
         bal = r['balance']
-        line = f"<blockquote><b>{idx}. 👤 {u_name}</b>\n   ├ 👥 রেফার করেছে: <b>{s_refs} জন</b>\n   └ 💵 ব্যালেন্স: <b>৳ {bal:.2f}</b></blockquote>"
+        # ফরম্যাট: প্রথমে নাম এবং একবারে ডান কিনারায় ব্যালেন্স
+        line = f"<blockquote><b>{idx}. 👤 {u_name}</b> ──────── <b>৳ {bal:.2f}</b></blockquote>"
         ref_lines.append(line)
 
     joined_list_str = "\n".join(ref_lines)
 
-    my_ref_text = f"""👥 <b>আমার রেফারেল টিম (টপ ১০ সদস্য)</b>
+    my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা (টপ ১০)</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>আপনার মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
+📊 <b>মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
 
 {joined_list_str}
 
-⚡ <i>আপনার রেফারে জয়েন করা প্রতিটি সদস্যের লাইভ ডাটা এখানে প্রদর্শিত হচ্ছে!</i>"""
+⚡ <i>আপনার রেফারেল সদস্যদের রিয়েলটাইম লাইভ ব্যালেন্স প্রদর্শিত হচ্ছে!</i>"""
 
     bot.send_message(message.chat.id, my_ref_text)
 

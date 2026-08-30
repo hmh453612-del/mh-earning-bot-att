@@ -834,7 +834,7 @@ def video_ad_handler(message):
 # =================================================================
 @bot.chat_member_handler()
 def handle_chat_member_update(update: types.ChatMemberUpdated):
-    """ইউজার চ্যানেল বা গ্রুপ থেকে লিভ নিলে বা জয়েন করলে রিয়েলটাইম ট্র্যাক করা"""
+    """ইউজার চ্যানেল বা গ্রুপ থেকে লিভ নিলে সাথে সাথে ডিটেকশন ও ব্যালেন্স কাটা"""
     try:
         chat = update.chat
         user = update.new_chat_member.user
@@ -843,7 +843,6 @@ def handle_chat_member_update(update: types.ChatMemberUpdated):
         old_status = update.old_chat_member.status
         new_status = update.new_chat_member.status
 
-        # যদি ইউজার মেম্বার/অ্যাডমিন থেকে left বা kicked হয়ে যায়
         was_in_chat = old_status in ['member', 'administrator', 'creator', 'restricted']
         is_now_in_chat = new_status in ['member', 'administrator', 'creator', 'restricted']
 
@@ -870,7 +869,6 @@ def handle_chat_member_update(update: types.ChatMemberUpdated):
                 if user_data:
                     completed_list = user_data.get("completedTasksList", {}) or {}
                     if completed_list.get(str(matched_task_id)) is True:
-                        # টাকা কেটে নেওয়া এবং লিস্ট থেকে বাদ দেওয়া
                         cur_bal = float(user_data.get("balance", 0.0))
                         cur_tasks_count = int(user_data.get("completedTasksCount", 0))
 
@@ -885,7 +883,6 @@ def handle_chat_member_update(update: types.ChatMemberUpdated):
                             "completedTasksList": completed_list
                         })
 
-                        # সুন্দর নোটিফিকেশন এবং পুনরায় জয়েন ও ভেরিফাই করার ইনলাইন বাটন পাঠানো
                         notif_kb = types.InlineKeyboardMarkup(row_width=1)
                         task_obj = all_tasks.get(matched_task_id)
                         t_url = task_obj.get("link", task_obj.get("url", "https://t.me")) if task_obj else "https://t.me"
@@ -1249,11 +1246,11 @@ def fallback_unknown_message(message):
     user_id = str(message.from_user.id)
     fallback_text = """🤖 <b>দুঃখিত! আপনি যা লিখেছেন তা আমি বুঝতে পারিনি।</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-</blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
+<blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
     bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 🚀 মেইন ইঞ্জিন রানার
+# 🚀 মেইন ইঞ্জিন রানার (Allowed Updates সহ আপডেট করা)
 # =================================================================
 if __name__ == "__main__":
     print("🌐 Keep-Alive Server চালু হচ্ছে...")
@@ -1262,4 +1259,5 @@ if __name__ == "__main__":
     server_thread.start()
 
     print("✅ MH Earning Bot Engine সফলভাবে চালু হয়েছে...")
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    # এখানে allowed_updates যোগ করা হয়েছে যাতে টেলিগ্রাম বট লিভ নেওয়া ট্র্যাক করতে পারে
+    bot.infinity_polling(timeout=10, long_polling_timeout=5, allowed_updates=['message', 'chat_member', 'callback_query'])

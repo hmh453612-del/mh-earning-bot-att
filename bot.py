@@ -48,7 +48,6 @@ def run_web_server():
 # 🛡️ পারমিশন ও ফায়ারবেস ইঞ্জিন
 # =================================================================
 def is_admin(user_id):
-    """ব্যবহারকারী অ্যাডমিন কি না যাচাই করা"""
     return str(user_id).strip() in ADMIN_IDS
 
 def get_user_from_db(user_id):
@@ -831,73 +830,87 @@ def video_ad_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (অ্যান্টি-চিট ও আনসাবস্ক্রাইব চেকসহ)
+# ৪. ট্যাক্স সম্পূর্ণ করুন এবং রিয়েল-টাইম চ্যানেল লিভ ডিটেকশন হ্যান্ডলার
 # =================================================================
-def check_and_deduct_left_tasks(user_id, user_data):
-    """ইউজার ইতিপূর্বে কমপ্লিট করা টাস্কের চ্যানেল বা গ্রুপ থেকে লিভ নিয়েছে কি না চেক করে ব্যালেন্স কেটে নেওয়া"""
-    completed_list = user_data.get("completedTasksList", {}) or {}
-    if not completed_list:
-        return user_data
+@bot.chat_member_handler()
+def handle_chat_member_update(update: types.ChatMemberUpdated):
+    """ইউজার চ্যানেল বা গ্রুপ থেকে লিভ নিলে বা জয়েন করলে রিয়েলটাইম ট্র্যাক করা"""
+    try:
+        chat = update.chat
+        user = update.new_chat_member.user
+        user_id = str(user.id)
 
-    all_tasks = get_all_tasks_from_db()
-    cur_bal = float(user_data.get("balance", 0.0))
-    cur_tasks_count = int(user_data.get("completedTasksCount", 0))
-    
-    deducted_amount = 0.0
-    updated_completed_list = dict(completed_list)
-    has_changes = False
+        old_status = update.old_chat_member.status
+        new_status = update.new_chat_member.status
 
-    for task_id, is_completed in list(completed_list.items()):
-        if is_completed is True:
-            task_info = all_tasks.get(str(task_id))
-            if task_info:
-                t_link = task_info.get("link", task_info.get("url", ""))
-                t_reward = float(task_info.get("reward", 0.0))
-                c_uname = extract_telegram_username(t_link)
-                
-                if c_uname:
-                    # চ্যানেল বা গ্রুপে মেম্বার আছে কিনা চেক
-                    is_still_member = verify_telegram_membership(c_uname, user_id)
-                    if not is_still_member:
-                        # মেম্বার না থাকলে লিস্ট থেকে সরিয়ে দিব এবং টাকা কাটবো
-                        deducted_amount += t_reward
-                        updated_completed_list.pop(str(task_id), None)
-                        cur_tasks_count = max(0, cur_tasks_count - 1)
-                        has_changes = True
+        # যদি ইউজার মেম্বার/অ্যাডমিন থেকে left বা kicked হয়ে যায়
+        was_in_chat = old_status in ['member', 'administrator', 'creator', 'restricted']
+        is_now_in_chat = new_status in ['member', 'administrator', 'creator', 'restricted']
 
-    if has_changes and deducted_amount > 0:
-        new_balance = max(0.0, cur_bal - deducted_amount)
-        update_user_in_db(user_id, {
-            "balance": new_balance,
-            "completedTasksCount": cur_tasks_count,
-            "completedTasksList": updated_completed_list
-        })
+        if was_in_chat and not is_now_in_chat:
+            chat_username = chat.username
+            if not chat_username:
+                return
 
-        # ইউজারকে সতর্কবার্তা বা নোটিফিকেশন পাঠানো
-        try:
-            warning_text = f"""⚠️ <b>সতর্কবার্তা! ট্যাক্স রিওয়ার্ড কাটা হয়েছে!</b>
+            all_tasks = get_all_tasks_from_db()
+            matched_task_id = None
+            task_reward = 0.0
+
+            for tid, t in all_tasks.items():
+                if isinstance(t, dict):
+                    t_link = t.get("link", t.get("url", ""))
+                    c_uname = extract_telegram_username(t_link)
+                    if c_uname and c_uname.lower() == chat_username.lower():
+                        matched_task_id = tid
+                        task_reward = float(t.get("reward", 5.00))
+                        break
+
+            if matched_task_id:
+                user_data = get_user_from_db(user_id)
+                if user_data:
+                    completed_list = user_data.get("completedTasksList", {}) or {}
+                    if completed_list.get(str(matched_task_id)) is True:
+                        # টাকা কেটে নেওয়া এবং লিস্ট থেকে বাদ দেওয়া
+                        cur_bal = float(user_data.get("balance", 0.0))
+                        cur_tasks_count = int(user_data.get("completedTasksCount", 0))
+
+                        new_balance = max(0.0, cur_bal - task_reward)
+                        new_tasks_count = max(0, cur_tasks_count - 1)
+
+                        completed_list.pop(str(matched_task_id), None)
+
+                        update_user_in_db(user_id, {
+                            "balance": new_balance,
+                            "completedTasksCount": new_tasks_count,
+                            "completedTasksList": completed_list
+                        })
+
+                        # সুন্দর নোটিফিকেশন এবং পুনরায় জয়েন ও ভেরিফাই করার ইনলাইন বাটন পাঠানো
+                        notif_kb = types.InlineKeyboardMarkup(row_width=1)
+                        task_obj = all_tasks.get(matched_task_id)
+                        t_url = task_obj.get("link", task_obj.get("url", "https://t.me")) if task_obj else "https://t.me"
+                        
+                        btn_rejoin = types.InlineKeyboardButton(text="👉 এখনই পুনরায় জয়েন করুন 🚀", url=t_url)
+                        btn_reverify = types.InlineKeyboardButton(text="✅ ভেরিফাই করে টাকা ফিরিয়ে নিন 🔄", callback_data=f"verify_{matched_task_id}")
+                        notif_kb.add(btn_rejoin, btn_reverify)
+
+                        notif_msg = f"""⚠️ <b>সতর্কবার্তা! চ্যানেল থেকে লিভ নেওয়ার কারণে রিওয়ার্ড কাটা হয়েছে!</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>❌ আপনি যে চ্যানেল বা গ্রুপে জয়েন করে টাস্ক সম্পন্ন করেছিলেন, সেখান থেকে আনসাবস্ক্রাইব বা লিভ নিয়েছেন!
+<blockquote>❌ আপনি আমাদের অফিশিয়াল চ্যানেল/গ্রুপ থেকে বের হয়ে গেছেন!
 
-📉 <b>কর্তনকৃত পরিমাণ:</b> <b>- ৳ {deducted_amount:.2f} টাকা</b>
+📉 <b>কর্তনকৃত পরিমাণ:</b> <b>- ৳ {task_reward:.2f} টাকা</b>
 💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
 
-📌 <i>নিয়ম ভঙ্গ করায় আপনার একাউন্ট থেকে রিওয়ার্ডের টাকা কেটে নেওয়া হয়েছে। পুনরায় টাস্ক কমপ্লিট রাখতে চ্যানেল/গ্রুপে যুক্ত থাকুন!</i>"""
-            bot.send_message(int(user_id), warning_text)
-        except Exception:
-            pass
+👇 <i>টাকা পুনরায় ওয়ালেটে ফেরত পেতে নিচের বাটনে ক্লিক করে আবার জয়েন করুন এবং ভেরিফাই করুন:</i>"""
 
-        return get_user_from_db(user_id) or user_data
-
-    return user_data
+                        bot.send_message(int(user_id), notif_msg, reply_markup=notif_kb)
+    except Exception as e:
+        print(f"Chat Member Update Error: {e}")
 
 @bot.message_handler(func=lambda msg: msg.text == "📋 ট্যাক্স সম্পূর্ণ করুন")
 def task_dashboard_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
-    
-    # টাস্ক মেন্যুতে আসার সাথে সাথেই চেক করা হবে সে কোনো চ্যানেল ছেড়েছে কি না
-    user_data = check_and_deduct_left_tasks(user_id, user_data)
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
     all_tasks = get_all_tasks_from_db()
@@ -922,7 +935,7 @@ def task_dashboard_handler(message):
 ১. নিচের লিংকগুলোতে ক্লিক করে চ্যানেল/গ্রুপে জয়েন করুন।
 ২. জয়েন সম্পন্ন হলে <b>'✅ ভেরিফাই করুন'</b> বাটনে চাপ দিন।
 ৩. ভেরিফাই হওয়ামাত্রই বোনাস ব্যালেন্সে যুক্ত হবে!
-⚠️ <i>সতর্কতা: জয়েন করার পর চ্যানেল বা গ্রুপ থেকে লিভ নিলে আপনার ব্যালেন্স থেকে সমপরিমাণ টাকা স্বয়ংক্রিয়ভাবে কেটে নেওয়া হবে।</i></blockquote>\n"""
+⚠️ <i>সতর্কতা: জয়েন করার পর চ্যানেল বা গ্রুপ থেকে লিভ নিলে সাথে সাথেই আপনার ব্যালেন্স থেকে সমপরিমাণ টাকা কেটে নেওয়া হবে।</i></blockquote>\n"""
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
     
@@ -958,9 +971,6 @@ def verify_task_callback(call):
     task_id = call.data.replace("verify_", "")
 
     user_data = get_user_from_db(user_id) or {}
-    
-    # ভেরিফাই করার আগেও চেক করে নেওয়া ইউজার অন্য কোনো টাস্ক ছেড়েছে কি না
-    user_data = check_and_deduct_left_tasks(user_id, user_data)
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
     if completed_tasks_list.get(str(task_id)) is True:
@@ -1020,10 +1030,6 @@ def balance_handler(message):
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
 
     user_data = get_user_from_db(user_id) or {}
-    
-    # ব্যালেন্স দেখতে আসার পর ব্যাকগ্রাউন্ডে লিভ চেক করা
-    user_data = check_and_deduct_left_tasks(user_id, user_data)
-    
     balance = float(user_data.get("balance", 0.00))
     ads_watched = int(user_data.get("adsWatched", 0))
     referrals = int(user_data.get("referrals", 0))
@@ -1243,7 +1249,7 @@ def fallback_unknown_message(message):
     user_id = str(message.from_user.id)
     fallback_text = """🤖 <b>দুঃখিত! আপনি যা লিখেছেন তা আমি বুঝতে পারিনি।</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
+</blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
     bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id))
 
 # =================================================================

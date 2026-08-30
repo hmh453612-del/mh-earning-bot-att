@@ -251,7 +251,6 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 # ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
 # =================================================================
 def get_main_keyboard(user_id=None):
-    """সাধারণ ইউজার কিবোর্ড (লিডারবোর্ড ও অ্যাডমিন বাটনসহ)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_task = types.KeyboardButton("💼 কাজ ⚡")
     btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
@@ -270,7 +269,6 @@ def get_main_keyboard(user_id=None):
     return keyboard
 
 def get_leaderboard_keyboard():
-    """🏆 লিডারবোর্ড সাব-মেন্যু কিবোর্ড (৩টি বাটন)"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     btn_top10 = types.KeyboardButton("🏆 টপ ১০ লিডারবোর্ড")
     btn_my_refs = types.KeyboardButton("👥 আমার রেফারেল")
@@ -281,7 +279,6 @@ def get_leaderboard_keyboard():
     return keyboard
 
 def get_admin_keyboard():
-    """👑 এক্সক্লুসিভ অ্যাডমিন কিবোর্ড মেন্যু"""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
     btn_stats = types.KeyboardButton("📊 লাইভ ড্যাশবোর্ড")
@@ -651,7 +648,7 @@ def process_admin_input(message):
         if add_task_to_db(new_task):
             bot.send_message(message.chat.id, f"🎉 <b>সফলভাবে নতুন টাস্ক যুক্ত করা হয়েছে!</b>\n\n📌 টাইটেল: {title}\n💰 রিওয়ার্ড: ৳ {rew:.2f}\n🔗 লিংক: {link}", reply_markup=get_admin_keyboard())
         else:
-            bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন।", reply_markup=get_admin_keyboard())
+            bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন.", reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
     elif state == "adm_search_user":
@@ -834,12 +831,73 @@ def video_ad_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
 
 # =================================================================
-# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার
+# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (অ্যান্টি-চিট ও আনসাবস্ক্রাইব চেকসহ)
 # =================================================================
+def check_and_deduct_left_tasks(user_id, user_data):
+    """ইউজার ইতিপূর্বে কমপ্লিট করা টাস্কের চ্যানেল বা গ্রুপ থেকে লিভ নিয়েছে কি না চেক করে ব্যালেন্স কেটে নেওয়া"""
+    completed_list = user_data.get("completedTasksList", {}) or {}
+    if not completed_list:
+        return user_data
+
+    all_tasks = get_all_tasks_from_db()
+    cur_bal = float(user_data.get("balance", 0.0))
+    cur_tasks_count = int(user_data.get("completedTasksCount", 0))
+    
+    deducted_amount = 0.0
+    updated_completed_list = dict(completed_list)
+    has_changes = False
+
+    for task_id, is_completed in list(completed_list.items()):
+        if is_completed is True:
+            task_info = all_tasks.get(str(task_id))
+            if task_info:
+                t_link = task_info.get("link", task_info.get("url", ""))
+                t_reward = float(task_info.get("reward", 0.0))
+                c_uname = extract_telegram_username(t_link)
+                
+                if c_uname:
+                    # চ্যানেল বা গ্রুপে মেম্বার আছে কিনা চেক
+                    is_still_member = verify_telegram_membership(c_uname, user_id)
+                    if not is_still_member:
+                        # মেম্বার না থাকলে লিস্ট থেকে সরিয়ে দিব এবং টাকা কাটবো
+                        deducted_amount += t_reward
+                        updated_completed_list.pop(str(task_id), None)
+                        cur_tasks_count = max(0, cur_tasks_count - 1)
+                        has_changes = True
+
+    if has_changes and deducted_amount > 0:
+        new_balance = max(0.0, cur_bal - deducted_amount)
+        update_user_in_db(user_id, {
+            "balance": new_balance,
+            "completedTasksCount": cur_tasks_count,
+            "completedTasksList": updated_completed_list
+        })
+
+        # ইউজারকে সতর্কবার্তা বা নোটিফিকেশন পাঠানো
+        try:
+            warning_text = f"""⚠️ <b>সতর্কবার্তা! ট্যাক্স রিওয়ার্ড কাটা হয়েছে!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>❌ আপনি যে চ্যানেল বা গ্রুপে জয়েন করে টাস্ক সম্পন্ন করেছিলেন, সেখান থেকে আনসাবস্ক্রাইব বা লিভ নিয়েছেন!
+
+📉 <b>কর্তনকৃত পরিমাণ:</b> <b>- ৳ {deducted_amount:.2f} টাকা</b>
+💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
+
+📌 <i>নিয়ম ভঙ্গ করায় আপনার একাউন্ট থেকে রিওয়ার্ডের টাকা কেটে নেওয়া হয়েছে। পুনরায় টাস্ক কমপ্লিট রাখতে চ্যানেল/গ্রুপে যুক্ত থাকুন!</i>"""
+            bot.send_message(int(user_id), warning_text)
+        except Exception:
+            pass
+
+        return get_user_from_db(user_id) or user_data
+
+    return user_data
+
 @bot.message_handler(func=lambda msg: msg.text == "📋 ট্যাক্স সম্পূর্ণ করুন")
 def task_dashboard_handler(message):
     user_id = str(message.from_user.id)
     user_data = get_user_from_db(user_id) or {}
+    
+    # টাস্ক মেন্যুতে আসার সাথে সাথেই চেক করা হবে সে কোনো চ্যানেল ছেড়েছে কি না
+    user_data = check_and_deduct_left_tasks(user_id, user_data)
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
     all_tasks = get_all_tasks_from_db()
@@ -863,7 +921,8 @@ def task_dashboard_handler(message):
 <blockquote>⚡ <b>কাজের নিয়মাবলী:</b>
 ১. নিচের লিংকগুলোতে ক্লিক করে চ্যানেল/গ্রুপে জয়েন করুন।
 ২. জয়েন সম্পন্ন হলে <b>'✅ ভেরিফাই করুন'</b> বাটনে চাপ দিন।
-৩. ভেরিফাই হওয়ামাত্রই বোনাস ব্যালেন্সে যুক্ত হবে!</blockquote>\n"""
+৩. ভেরিফাই হওয়ামাত্রই বোনাস ব্যালেন্সে যুক্ত হবে!
+⚠️ <i>সতর্কতা: জয়েন করার পর চ্যানেল বা গ্রুপ থেকে লিভ নিলে আপনার ব্যালেন্স থেকে সমপরিমাণ টাকা স্বয়ংক্রিয়ভাবে কেটে নেওয়া হবে।</i></blockquote>\n"""
 
     task_kb = types.InlineKeyboardMarkup(row_width=1)
     
@@ -899,6 +958,9 @@ def verify_task_callback(call):
     task_id = call.data.replace("verify_", "")
 
     user_data = get_user_from_db(user_id) or {}
+    
+    # ভেরিফাই করার আগেও চেক করে নেওয়া ইউজার অন্য কোনো টাস্ক ছেড়েছে কি না
+    user_data = check_and_deduct_left_tasks(user_id, user_data)
     completed_tasks_list = user_data.get("completedTasksList", {}) or {}
 
     if completed_tasks_list.get(str(task_id)) is True:
@@ -958,6 +1020,10 @@ def balance_handler(message):
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
 
     user_data = get_user_from_db(user_id) or {}
+    
+    # ব্যালেন্স দেখতে আসার পর ব্যাকগ্রাউন্ডে লিভ চেক করা
+    user_data = check_and_deduct_left_tasks(user_id, user_data)
+    
     balance = float(user_data.get("balance", 0.00))
     ads_watched = int(user_data.get("adsWatched", 0))
     referrals = int(user_data.get("referrals", 0))
@@ -1021,7 +1087,6 @@ def refer_handler(message):
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 লিডারবোর্ড", "/leaderboard"])
 def leaderboard_menu_handler(message):
-    """🏆 লিডারবোর্ড বাটনে চাপ দিলে ৩টি সাব-বাটন কিবোর্ড আসবে"""
     text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং হাব</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
@@ -1038,7 +1103,6 @@ def leaderboard_menu_handler(message):
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
-    # ফায়ারবেস থেকে লাইভ ইউজার ডাটা ফেচ
     all_users = get_all_users_from_db()
 
     user_list = []
@@ -1048,7 +1112,6 @@ def top_10_leaderboard_handler(message):
             name = udata.get("name", "User")
             user_list.append({"id": uid, "name": name, "refs": refs})
 
-    # রেফার সংখ্যা অনুযায়ী বড় থেকে ছোট সাজানো
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
@@ -1059,7 +1122,6 @@ def top_10_leaderboard_handler(message):
         badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
         u_name = usr['name']
         ref_cnt = usr['refs']
-        # একটার নিচে আরেকটা: মেডেল/ক্রমিক + নাম — রেফার সংখ্যা
         leader_lines.append(f"{badge} <b>{u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
 
     if not leader_lines:
@@ -1078,7 +1140,7 @@ def top_10_leaderboard_handler(message):
     bot.send_message(message.chat.id, res_msg)
 
 # =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার (নাম এবং একবারে ডান কিনারায় ব্যালেন্স)
+# 👥 ২. আমার রেফারেল হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
 def my_referrals_list_handler(message):
@@ -1113,7 +1175,6 @@ def my_referrals_list_handler(message):
             "joinedAt": joined_at
         })
 
-    # ব্যালেন্স ও লেটেস্ট জয়েনিং অনুযায়ী সাজানো
     ref_items.sort(key=lambda x: (x["balance"], x["joinedAt"]), reverse=True)
     top_my_refs = ref_items[:10]
 
@@ -1131,7 +1192,6 @@ def my_referrals_list_handler(message):
     for idx, r in enumerate(top_my_refs, 1):
         u_name = r['name']
         bal = r['balance']
-        # প্রতিটি লাইন: ক্রমিক নম্বর + নাম ──────── ডান পাশে ব্যালেন্স
         line = f"<b>{idx}. 👤 {u_name}</b> ──────── <b>৳ {bal:.2f}</b>"
         ref_lines.append(line)
 

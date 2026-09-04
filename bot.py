@@ -377,7 +377,7 @@ def admin_panel_open(message):
 ➕ <b>নতুন টাস্ক:</b> সরাসরি চ্যানেল টাস্ক এড করুন
 📋 <b>টাস্ক ডিলিট:</b> সক্রিয় টাস্ক তালিকা ও মুছে ফেলা
 🔍 <b>ইউজার সার্চ:</b> ইউজারের বিস্তারিত একাউন্ট তথ্য
-📢 <b>অল ব্রডকাস্ট:</b> সকল ইউজারকে নোটিফিকেশন পাঠানো</blockquote>
+📢 <b>অল ব্রডকাস্ট:</b> সকল ইউজারকে নোটিফিকেশন পাঠানো (টেক্সট/ছবি/ভিডিও)</blockquote>
 
 👇 <i>যেকোনো একটি বাটন চেপে কাজ শুরু করুন:</i>"""
 
@@ -523,13 +523,26 @@ def admin_search_user_handler(message):
     msg = bot.send_message(message.chat.id, "🔍 যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b> পাঠান:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
+# ✅ আপগ্রেডেড অল ব্রডকাস্ট প্রম্পট
 @bot.message_handler(func=lambda msg: msg.text == "📢 অল ব্রডকাস্ট")
 def admin_broadcast_prompt(message):
     user_id = str(message.from_user.id)
     if not is_admin(user_id): return
 
     admin_states[user_id] = "adm_broadcast_msg"
-    msg = bot.send_message(message.chat.id, "📢 সব ইউজারের কাছে যে মেসেজটি পাঠাতে চান তা লিখুন (HTML ফরম্যাট সমর্থিত):\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    guide_msg = """📢 <b>সুপার অল ব্রডকাস্ট প্যানেল</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ <b>আপনি যেভাবে ব্রডকাস্ট করতে পারেন:</b>
+
+১. 📝 <b>শুধুমাত্র টেক্সট:</b> সাধারণ টেক্সট বা HTML ট্যাগসহ পাঠিয়ে দিন।
+২. 🖼️ <b>ছবি (Photo):</b> ক্যাপশনে HTML ট্যাগসহ ফটো সেন্ড করুন।
+৩. 🎬 <b>ভিডিও (Video):</b> ক্যাপশনে HTML ট্যাগসহ ভিডিও সেন্ড করুন।
+৪. 📄 <b>ডকুমেন্ট বা জিআইএফ:</b> যেকোনো মিডিয়া সাপোর্ট করবে।</blockquote>
+
+👇 <i>এখন আপনার মেসেজ, ফটো বা ভিডিওটি এখানে পাঠান:</i>
+<i>(বাতিল করতে <b>/cancel</b> লিখুন)</i>"""
+
+    msg = bot.send_message(message.chat.id, guide_msg)
     bot.register_next_step_handler(msg, process_admin_input)
 
 @bot.message_handler(func=lambda msg: msg.text == "🏠 ইউজার মেন্যুতে যান")
@@ -538,12 +551,14 @@ def admin_back_to_user_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (সহ অল-মিডিয়া ব্রডকাস্ট ইঞ্জিন)
 # =================================================================
 def process_admin_input(message):
     user_id = str(message.from_user.id)
     state = admin_states.get(user_id)
-    text = message.text.strip() if message.text else ""
+    
+    # টেক্সট অথবা মিডিয়া ক্যাপশন থেকে টেক্সট যাচাই
+    text = (message.text or message.caption or "").strip()
 
     if text.lower() == "/cancel":
         admin_states.pop(user_id, None)
@@ -673,26 +688,37 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
+    # 🚀 ফটো, ভিডিও, টেক্সট সহ ফুল ব্রডকাস্ট হ্যান্ডলার
     elif state == "adm_broadcast_msg":
-        broadcast_text = text
         all_users = get_all_users_from_db()
         user_list = list(all_users.keys())
 
-        bot.send_message(message.chat.id, f"🚀 <b>ব্রডকাস্ট শুরু হচ্ছে...</b> (মোট ইউজার: {len(user_list)} জন)", reply_markup=get_admin_keyboard())
-        
-        def run_broadcast():
+        source_chat_id = message.chat.id
+        source_msg_id = message.message_id
+
+        bot.send_message(message.chat.id, f"🚀 <b>ব্রডকাস্ট শুরু হচ্ছে...</b>\n👥 সর্বমোট ইউজার: <b>{len(user_list)} জন</b>", reply_markup=get_admin_keyboard())
+
+        def run_broadcast_worker(chat_id_src, msg_id_src, admin_chat_id):
             success, failed = 0, 0
             for uid in user_list:
                 try:
-                    bot.send_message(int(uid), broadcast_text, parse_mode="HTML")
+                    # copy_message এর মাধ্যমে টেক্সট, ফটো, ভিডিও ক্যাপশন ও ফরম্যাটসহ কপি হয়
+                    bot.copy_message(chat_id=int(uid), from_chat_id=chat_id_src, message_id=msg_id_src)
                     success += 1
                 except Exception:
                     failed += 1
-                time.sleep(0.04)
+                time.sleep(0.04) # টেলিগ্রাম রেট লিমিট হ্যান্ডলার
 
-            bot.send_message(int(user_id), f"🎉 <b>ব্রডকাস্ট সম্পন্ন হয়েছে!</b>\n✅ সফল: {success} জন\n❌ ব্যর্থ: {failed} জন")
+            report_msg = f"""🎉 <b>ব্রডকাস্ট সফলভাবে সম্পন্ন হয়েছে!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>✅ <b>সফলভাবে পৌঁছেছে:</b> <b>{success} জন</b>
+❌ <b>ব্যর্থ হয়েছে (ব্লক/অচল):</b> <b>{failed} জন</b></blockquote>"""
+            try:
+                bot.send_message(int(admin_chat_id), report_msg)
+            except Exception:
+                pass
 
-        threading.Thread(target=run_broadcast).start()
+        threading.Thread(target=run_broadcast_worker, args=(source_chat_id, source_msg_id, user_id)).start()
         admin_states.pop(user_id, None)
 
 # =================================================================
@@ -834,7 +860,6 @@ def video_ad_handler(message):
 # =================================================================
 @bot.chat_member_handler()
 def handle_chat_member_update(update: types.ChatMemberUpdated):
-    """ইউজার চ্যানেল বা গ্রুপ থেকে লিভ নিলে সাথে সাথে ডিটেকশন ও ব্যালেন্স কাটা"""
     try:
         chat = update.chat
         user = update.new_chat_member.user
@@ -1250,7 +1275,7 @@ def fallback_unknown_message(message):
     bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 🚀 মেইন ইঞ্জিন রানার (Allowed Updates সহ আপডেট করা)
+# 🚀 মেইন ইঞ্জিন রানার (Allowed Updates সহ)
 # =================================================================
 if __name__ == "__main__":
     print("🌐 Keep-Alive Server চালু হচ্ছে...")
@@ -1259,5 +1284,4 @@ if __name__ == "__main__":
     server_thread.start()
 
     print("✅ MH Earning Bot Engine সফলভাবে চালু হয়েছে...")
-    # এখানে allowed_updates যোগ করা হয়েছে যাতে টেলিগ্রাম বট লিভ নেওয়া ট্র্যাক করতে পারে
     bot.infinity_polling(timeout=10, long_polling_timeout=5, allowed_updates=['message', 'chat_member', 'callback_query'])

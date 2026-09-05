@@ -161,17 +161,19 @@ def verify_telegram_membership(channel_username, user_id):
     return False
 
 # =================================================================
-# 📐 লিডারবোর্ড ফর্মেটিং ইঞ্জিন (একদম সমান সাইজ রাখার জন্য)
+# 📐 মোবাইল ফ্রেন্ডলি সোজা লাইন ফর্মেটিং ইঞ্জিন
 # =================================================================
-def format_aligned_name(name, total_width=14):
+def format_aligned_name(name, total_width=11):
     clean_name = str(name).strip().replace("<", "").replace(">", "")
-    if len(clean_name) > total_width - 2:
-        # নাম বড় হলে কেটে .. যুক্ত করা
-        disp = clean_name[:total_width - 4] + ".."
+    clean_name = " ".join(clean_name.split())
+    
+    max_text_len = total_width - 3  # ৮ অক্ষরের বেশি হলে কেটে .. দেওয়া হবে
+    if len(clean_name) > max_text_len:
+        disp = clean_name[:max_text_len] + ".."
     else:
         disp = clean_name + ".."
     
-    # বাকি জায়গা _ দিয়ে সমান করে সোজা লাইন বানানো
+    # বাকি অংশ _ দিয়ে সমান রাখা হবে যাতে প্রতিটি লাইন সোজা থাকে
     remaining = total_width - len(disp)
     if remaining > 0:
         disp += "_" * remaining
@@ -620,7 +622,7 @@ def process_admin_input(message):
         target_uid = text
         u_data = get_user_from_db(target_uid)
         if not u_data:
-            bot.send_message(message.chat.id, "❌ এই আইডির কোনো ইউজার পাওয়া যায়নি!")
+            bot.send_message(message.chat.id, "❌ এই আইডির কোনো ইউজার পাওয়া যায়নি!", reply_markup=get_admin_keyboard())
             admin_states.pop(user_id, None)
             return
 
@@ -1140,7 +1142,7 @@ def leaderboard_menu_handler(message):
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
 # =================================================================
-# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (একদম সোজা লাইনে পারফেক্ট ফর্মেট)
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (১ লাইনে সোজা ফর্মেট)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
@@ -1171,11 +1173,11 @@ def top_10_leaderboard_handler(message):
     leader_lines = []
     for idx, usr in enumerate(top_10):
         badge = medals[idx] if idx < len(medals) else f"{idx+1}."
-        aligned_name = format_aligned_name(usr['name'], total_width=16)
+        aligned_name = format_aligned_name(usr['name'], total_width=11)
         ref_cnt = usr['refs']
         
-        # 📌 নির্দিষ্ট সোজা ফর্মেট: Badge <code>Name..____</code> 18 রেফার
-        leader_lines.append(f"{badge} <code>{aligned_name}</code>  <b>{ref_cnt:2d} রেফার</b>")
+        # ✅ ১ লাইনে কমপ্যাক্ট ফর্মেট: লাইন নিচে নামবে না
+        leader_lines.append(f"{badge} <code>{aligned_name}</code> <b>{ref_cnt} রেফার</b>")
 
     if not leader_lines:
         leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
@@ -1197,7 +1199,7 @@ def top_10_leaderboard_handler(message):
     bot.send_message(message.chat.id, res_msg)
 
 # =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার (সোজা ও পরিচ্ছন্ন ফর্মেট)
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (১ লাইনে সোজা ফর্মেট)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
 def my_referrals_list_handler(message):
@@ -1247,11 +1249,11 @@ def my_referrals_list_handler(message):
 
     ref_lines = []
     for idx, r in enumerate(top_my_refs, 1):
-        aligned_name = format_aligned_name(r['name'], total_width=16)
+        aligned_name = format_aligned_name(r['name'], total_width=11)
         bal = r['balance']
         
-        # 📌 নির্দিষ্ট সোজা ফর্মেট: 1. 👤 <code>Name..____</code> ৳ 50.00
-        ref_lines.append(f"<b>{idx:2d}.</b> 👤 <code>{aligned_name}</code>  <b>৳ {bal:.2f}</b>")
+        # ✅ ১ লাইনে পারফেক্ট ফর্মেট: 1. Name..__ ৳4138.10
+        ref_lines.append(f"<b>{idx}.</b> <code>{aligned_name}</code> <b>৳{bal:.2f}</b>")
 
     joined_list_str = "\n".join(ref_lines)
 

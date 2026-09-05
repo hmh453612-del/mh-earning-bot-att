@@ -60,6 +60,12 @@ def get_user_from_db(user_id):
         print(f"Firebase Read Error: {e}")
     return None
 
+def get_user_lang(user_id):
+    u_data = get_user_from_db(str(user_id))
+    if u_data and isinstance(u_data, dict):
+        return u_data.get("language", "bn")
+    return "bn"
+
 def update_user_in_db(user_id, data):
     try:
         url = f"{FIREBASE_DB_URL}/users/{user_id}.json"
@@ -167,20 +173,19 @@ def format_aligned_name(name, total_width=11):
     clean_name = str(name).strip().replace("<", "").replace(">", "")
     clean_name = " ".join(clean_name.split())
     
-    max_text_len = total_width - 3  # ৮ অক্ষরের বেশি হলে কেটে .. দেওয়া হবে
+    max_text_len = total_width - 3
     if len(clean_name) > max_text_len:
         disp = clean_name[:max_text_len] + ".."
     else:
         disp = clean_name + ".."
     
-    # বাকি অংশ _ দিয়ে সমান রাখা হবে যাতে লাইন নিচে না নামে
     remaining = total_width - len(disp)
     if remaining > 0:
         disp += "_" * remaining
     return disp
 
 # =================================================================
-# 👥 রেফারেল ও একাউন্ট হ্যান্ডলার
+# 👥 রেফারেল ও একাউন্ট হ্যান্ডলার (দ্বিভাষিক নোটিফিকেশন সহ)
 # =================================================================
 def handle_referral_and_user_creation(user_id, full_name, username, referrer_id):
     user_id_str = str(user_id)
@@ -215,6 +220,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
             if referrer_data:
                 cur_bal = float(referrer_data.get("balance", 0.0))
                 cur_ref = int(referrer_data.get("referrals", 0))
+                ref_lang = referrer_data.get("language", "bn")
 
                 new_balance = cur_bal + current_refer_reward
                 new_ref_count = cur_ref + 1
@@ -236,16 +242,33 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 
                     notify_kb = types.InlineKeyboardMarkup(row_width=2)
                     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={referrer_id}"
-                    btn_wallet = types.InlineKeyboardButton(text="💳 ওয়ালেট ব্যালেন্স", web_app=types.WebAppInfo(url=webapp_url))
                     
                     share_link = f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
-                    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা বোনাস!"
-                    share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
-                    btn_more_ref = types.InlineKeyboardButton(text="📢 আরও রেফার", url=share_url)
 
-                    notify_kb.add(btn_wallet, btn_more_ref)
+                    if ref_lang == "en":
+                        btn_wallet = types.InlineKeyboardButton(text="💳 Wallet Balance", web_app=types.WebAppInfo(url=webapp_url))
+                        share_text = f"🔥 Join MH EARNING BOT and start earning money!\n🚀 Earn ৳ {current_refer_reward:.2f} instant bonus per refer!"
+                        share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
+                        btn_more_ref = types.InlineKeyboardButton(text="📢 Refer More", url=share_url)
+                        
+                        notify_text = f"""🎉 <b>Congratulations! Successful Referral!</b> 🚀
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>👤 <b>Member:</b> {full_name}
+🆔 <b>ID:</b> <code>{user_id_str}</code>
+⏰ <b>Time:</b> {formatted_time}
 
-                    notify_text = f"""🎉 <b>অভিনন্দন! সফল রেফারেল!</b> 🚀
+💎 <b>Referral Bonus:</b> <b>+ ৳ {current_refer_reward:.2f} BDT</b>
+👥 <b>Total Referrals:</b> <b>{new_ref_count} Members</b>
+💵 <b>Current Balance:</b> <b>৳ {new_balance:.2f} BDT</b></blockquote>
+
+⚡ <i>Bonus added directly to your main wallet!</i>"""
+                    else:
+                        btn_wallet = types.InlineKeyboardButton(text="💳 ওয়ালেট ব্যালেন্স", web_app=types.WebAppInfo(url=webapp_url))
+                        share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা বোনাস!"
+                        share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
+                        btn_more_ref = types.InlineKeyboardButton(text="📢 আরও রেফার", url=share_url)
+                        
+                        notify_text = f"""🎉 <b>অভিনন্দন! সফল রেফারেল!</b> 🚀
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>👤 <b>সদস্য:</b> {full_name}
 🆔 <b>আইডি:</b> <code>{user_id_str}</code>
@@ -257,6 +280,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 
 ⚡ <i>বোনাসটি সরাসরি আপনার মূল ওয়ালেটে যুক্ত হয়েছে!</i>"""
 
+                    notify_kb.add(btn_wallet, btn_more_ref)
                     bot.send_message(int(referrer_id), notify_text, reply_markup=notify_kb, disable_web_page_preview=True)
                 except Exception as err:
                     print(f"Referral Notification Error: {err}")
@@ -267,16 +291,25 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
         })
 
 # =================================================================
-# ⌨️ কিবোর্ড লেআউটসমূহ (Reply Keyboards)
+# ⌨️ দ্বিভাষিক কিবোর্ড লেআউটসমূহ (Bilingual Keyboards)
 # =================================================================
-def get_main_keyboard(user_id=None):
+def get_main_keyboard(user_id=None, lang="bn"):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-    btn_task = types.KeyboardButton("💼 কাজ ⚡")
-    btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
-    btn_refer = types.KeyboardButton("👥 রেফার 🎁")
-    btn_leaderboard = types.KeyboardButton("🏆 লিডারবোর্ড")
-    btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
-    btn_lang = types.KeyboardButton("🌐 ভাষা পরিবর্তন")
+    
+    if lang == "en":
+        btn_task = types.KeyboardButton("💼 Tasks ⚡")
+        btn_balance = types.KeyboardButton("💰 Balance 💎")
+        btn_refer = types.KeyboardButton("👥 Refer 🎁")
+        btn_leaderboard = types.KeyboardButton("🏆 Leaderboard")
+        btn_support = types.KeyboardButton("🛠️ Support 💬")
+        btn_lang = types.KeyboardButton("🌐 Change Language")
+    else:
+        btn_task = types.KeyboardButton("💼 কাজ ⚡")
+        btn_balance = types.KeyboardButton("💰 ব্যালেন্স 💎")
+        btn_refer = types.KeyboardButton("👥 রেফার 🎁")
+        btn_leaderboard = types.KeyboardButton("🏆 লিডারবোর্ড")
+        btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
+        btn_lang = types.KeyboardButton("🌐 ভাষা পরিবর্তন")
 
     keyboard.row(btn_task, btn_balance)
     keyboard.row(btn_refer, btn_leaderboard)
@@ -288,13 +321,33 @@ def get_main_keyboard(user_id=None):
 
     return keyboard
 
-def get_leaderboard_keyboard():
+def get_leaderboard_keyboard(lang="bn"):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-    btn_top10 = types.KeyboardButton("🏆 টপ ১০ লিডারবোর্ড")
-    btn_my_refs = types.KeyboardButton("👥 আমার রেফারেল")
-    btn_back = types.KeyboardButton("🔙 ব্যাক")
+    if lang == "en":
+        btn_top10 = types.KeyboardButton("🏆 Top 10 Leaderboard")
+        btn_my_refs = types.KeyboardButton("👥 My Referrals")
+        btn_back = types.KeyboardButton("🔙 Back")
+    else:
+        btn_top10 = types.KeyboardButton("🏆 টপ ১০ লিডারবোর্ড")
+        btn_my_refs = types.KeyboardButton("👥 আমার রেফারেল")
+        btn_back = types.KeyboardButton("🔙 ব্যাক")
 
     keyboard.row(btn_top10, btn_my_refs)
+    keyboard.row(btn_back)
+    return keyboard
+
+def get_work_keyboard(lang="bn"):
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    if lang == "en":
+        btn_video = types.KeyboardButton("🎬 Watch Video Ads")
+        btn_tasks = types.KeyboardButton("📋 Complete Tasks")
+        btn_back = types.KeyboardButton("🔙 Back")
+    else:
+        btn_video = types.KeyboardButton("🎬 ভিডিও এড দেখুন")
+        btn_tasks = types.KeyboardButton("📋 ট্যাক্স সম্পূর্ণ করুন")
+        btn_back = types.KeyboardButton("🔙 ব্যাক")
+
+    keyboard.row(btn_video, btn_tasks)
     keyboard.row(btn_back)
     return keyboard
 
@@ -322,19 +375,6 @@ def get_admin_keyboard():
     keyboard.row(btn_back_user)
     return keyboard
 
-def get_work_keyboard():
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-    btn_video = types.KeyboardButton("🎬 ভিডিও এড দেখুন")
-    btn_tasks = types.KeyboardButton("📋 ট্যাক্স সম্পূর্ণ করুন")
-    btn_back = types.KeyboardButton("🔙 ব্যাক")
-
-    keyboard.row(btn_video, btn_tasks)
-    keyboard.row(btn_back)
-    return keyboard
-
-# =================================================================
-# 🌐 ভাষা নির্বাচন কিবোর্ড এবং ফাংশন
-# =================================================================
 def get_language_inline_keyboard():
     kb = types.InlineKeyboardMarkup(row_width=2)
     btn_bn = types.InlineKeyboardButton("🇧🇩 বাংলা", callback_data="setlang_bn")
@@ -344,18 +384,15 @@ def get_language_inline_keyboard():
 
 def send_main_dashboard(chat_id, user_id, lang="bn"):
     referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-
     inline_kb = types.InlineKeyboardMarkup(row_width=1)
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
-    btn_webapp = types.InlineKeyboardButton(text="🚀 ওপেন আর্নিং অ্যাপ 📱", web_app=types.WebAppInfo(url=webapp_url))
-    
-    share_text = "🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন ফ্রি টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ইনস্ট্যান্ট ৫০ টাকা বোনাস!"
-    share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
-    btn_share = types.InlineKeyboardButton(text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url)
-
-    inline_kb.add(btn_webapp, btn_share)
 
     if lang == "en":
+        btn_webapp = types.InlineKeyboardButton(text="🚀 Open Earning App 📱", web_app=types.WebAppInfo(url=webapp_url))
+        share_text = "🔥 Join MH EARNING BOT and start earning money daily!\n\n🚀 Get ৳ 50.00 instant referral bonus!"
+        share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+        btn_share = types.InlineKeyboardButton(text="📢 Share With Friends 🎁", url=share_url)
+
         welcome_text = f"""👑 <b>MH EARNING BOT PREMIER</b> 👑
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>✨ <b>The premier platform to earn money easily from home!</b>
@@ -369,6 +406,11 @@ def send_main_dashboard(chat_id, user_id, lang="bn"):
 <code>{referral_link}</code>"""
         hint_text = "👇 <b>Choose an option from the menu below:</b>"
     else:
+        btn_webapp = types.InlineKeyboardButton(text="🚀 ওপেন আর্নিং অ্যাপ 📱", web_app=types.WebAppInfo(url=webapp_url))
+        share_text = "🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন ফ্রি টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ইনস্ট্যান্ট ৫০ টাকা বোনাস!"
+        share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+        btn_share = types.InlineKeyboardButton(text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url)
+
         welcome_text = f"""👑 <b>MH EARNING BOT PREMIER</b> 👑
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>✨ <b>ঘরে বসে সহজ উপায়ে আয় করার প্রিমিয়াম প্ল্যাটফর্ম!</b>
@@ -382,11 +424,12 @@ def send_main_dashboard(chat_id, user_id, lang="bn"):
 <code>{referral_link}</code>"""
         hint_text = "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>"
 
+    inline_kb.add(btn_webapp, btn_share)
     bot.send_message(chat_id, welcome_text, reply_markup=inline_kb, disable_web_page_preview=True)
-    bot.send_message(chat_id, hint_text, reply_markup=get_main_keyboard(user_id))
+    bot.send_message(chat_id, hint_text, reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
-# ১. /start কমান্ড হ্যান্ডলার (সবার প্রথমে ভাষা নির্বাচন শো করবে)
+# ১. /start কমান্ড হ্যান্ডলার (সবার প্রথমে ভাষা নির্বাচন)
 # =================================================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -410,7 +453,7 @@ Welcome! Please choose your preferred language below:</blockquote>"""
 
     bot.send_message(message.chat.id, lang_prompt, reply_markup=get_language_inline_keyboard())
 
-# 🌐 ভাষা বাটনে ক্লিক করলে কলব্যাক হ্যান্ডলার
+# 🌐 ভাষা নির্বাচন কলব্যাক হ্যান্ডলার
 @bot.callback_query_handler(func=lambda call: call.data in ["setlang_bn", "setlang_en"])
 def language_selection_callback(call):
     user_id = str(call.from_user.id)
@@ -419,24 +462,649 @@ def language_selection_callback(call):
     update_user_in_db(user_id, {"language": selected_lang})
 
     try:
-        # আগের ভাষা নির্বাচনের মেসেজটি কেটে দেওয়া
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
 
     bot.answer_callback_query(call.id, "✅ ভাষা সফলভাবে নির্বাচন করা হয়েছে!" if selected_lang == "bn" else "✅ Language selected successfully!")
-    
-    # এরপর স্বয়ংক্রিয়ভাবে মূল ড্যাশবোর্ড ও কিবোর্ড পাঠানো
     send_main_dashboard(call.message.chat.id, user_id, lang=selected_lang)
 
 # 🌐 কিবোর্ড থেকে ভাষা পরিবর্তন হ্যান্ডলার
-@bot.message_handler(func=lambda msg: msg.text in ["🌐 ভাষা পরিবর্তন", "/language", "ভাষা পরিবর্তন", "language", "Change Language"])
+@bot.message_handler(func=lambda msg: msg.text in ["🌐 ভাষা পরিবর্তন", "🌐 Change Language", "/language", "language", "ভাষা পরিবর্তন"])
 def change_language_handler(message):
     lang_prompt = """🌐 <b>ভাষা পরিবর্তন করুন / Change Language</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন:
 Choose a language from the buttons below:</blockquote>"""
     bot.send_message(message.chat.id, lang_prompt, reply_markup=get_language_inline_keyboard())
+
+# =================================================================
+# ২. কাজের বাটন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["💼 কাজ ⚡", "💼 Tasks ⚡", "/work", "/tasks"])
+def work_options_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+
+    if lang == "en":
+        reply_text = """💼 <b>Select Work Option</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ You can earn money daily in two simple ways:
+
+🎬 <b>Watch Video Ads:</b> Watch short video ads and get instant wallet balance.
+📋 <b>Complete Tasks:</b> Join social channels and earn high rewards.</blockquote>
+
+👇 <i>Choose an option from the keyboard below:</i>"""
+    else:
+        reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ আপনি দুইভাবে কাজ করে প্রতিদিন টাকা আয় করতে পারবেন:
+
+🎬 <b>ভিডিও এড দেখুন:</b> ছোট ছোট বিজ্ঞাপন দেখে ইনস্ট্যান্ট ওয়ালেটে টাকা যোগ করুন।
+📋 <b>ট্যাক্স সম্পূর্ণ করুন:</b> সোশ্যাল চ্যানেলে যুক্ত হয়ে বড় অংকের রিওয়ার্ড জিতে নিন।</blockquote>
+
+👇 <i>নিচের কিবোর্ড থেকে যেকোনো একটি অপশন বেছে নিন:</i>"""
+
+    bot.send_message(message.chat.id, reply_text, reply_markup=get_work_keyboard(lang=lang))
+
+# =================================================================
+# ৩. ভিডিও এড দেখুন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🎬 ভিডিও এড দেখুন", "🎬 Watch Video Ads"])
+def video_ad_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    user_data = get_user_from_db(user_id) or {}
+    ads_watched = int(user_data.get("adsWatched", 0))
+
+    cfg = get_settings_from_db()
+    current_ad_reward = float(cfg.get("adReward") or cfg.get("ad_reward") or AD_REWARD)
+    current_daily_limit = int(cfg.get("dailyAdLimit") or cfg.get("daily_ad_limit") or 10)
+
+    server1_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=1&tgWebAppStartParam={user_id}"
+    server2_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=2&tgWebAppStartParam={user_id}"
+
+    ad_kb = types.InlineKeyboardMarkup(row_width=2)
+    btn_server1 = types.InlineKeyboardButton(text="▶️ Server 1 ⚡", web_app=types.WebAppInfo(url=server1_webapp_url))
+    btn_server2 = types.InlineKeyboardButton(text="▶️ Server 2 ⚡", web_app=types.WebAppInfo(url=server2_webapp_url))
+    ad_kb.add(btn_server1, btn_server2)
+
+    if lang == "en":
+        msg_text = f"""🎬 <b>Premium Video Ads Zone</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>💎 <b>Ad Reward:</b> <b>৳ {current_ad_reward:.2f} BDT</b> per ad!
+📊 <b>Today's Watched:</b> <b>{ads_watched} / {current_daily_limit}</b>
+
+⚡ <b>Instructions:</b>
+1. Tap on <b>Server 1</b> or <b>Server 2</b> below.
+2. Watch the video ad completely until it ends.
+3. Your reward will be instantly credited to your wallet.</blockquote>
+
+👇 <i>Select a server to start watching ads:</i>"""
+    else:
+        msg_text = f"""🎬 <b>প্রিমিয়াম ভিডিও বিজ্ঞাপন জোন</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>💎 <b>বিজ্ঞাপন রিওয়ার্ড:</b> <b>৳ {current_ad_reward:.2f} টাকা</b> প্রতি ভিডিও!
+📊 <b>আজকের দেখা ভিডিও:</b> <b>{ads_watched} / {current_daily_limit}</b> টি
+
+⚡ <b>নিয়মাবলী:</b>
+১. নিচের <b>Server 1</b> অথবা <b>Server 2</b> বাটনে চাপ দিন।
+২. বিজ্ঞাপনটি সম্পূর্ণ শেষ হওয়া পর্যন্ত দেখুন।
+৩. দেখা শেষ হওয়ামাত্রই টাকা সরাসরি মূল ওয়ালেটে যুক্ত হবে।</blockquote>
+
+👇 <i>যেকোনো একটি সার্ভার নির্বাচন করে এড দেখুন:</i>"""
+
+    bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
+
+# =================================================================
+# ৪. ট্যাক্স সম্পূর্ণ করুন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.chat_member_handler()
+def handle_chat_member_update(update: types.ChatMemberUpdated):
+    try:
+        chat = update.chat
+        user = update.new_chat_member.user
+        user_id = str(user.id)
+
+        old_status = update.old_chat_member.status
+        new_status = update.new_chat_member.status
+
+        was_in_chat = old_status in ['member', 'administrator', 'creator', 'restricted']
+        is_now_in_chat = new_status in ['member', 'administrator', 'creator', 'restricted']
+
+        if was_in_chat and not is_now_in_chat:
+            chat_username = chat.username
+            if not chat_username:
+                return
+
+            all_tasks = get_all_tasks_from_db()
+            matched_task_id = None
+            task_reward = 0.0
+
+            for tid, t in all_tasks.items():
+                if isinstance(t, dict):
+                    t_link = t.get("link", t.get("url", ""))
+                    c_uname = extract_telegram_username(t_link)
+                    if c_uname and c_uname.lower() == chat_username.lower():
+                        matched_task_id = tid
+                        task_reward = float(t.get("reward", 5.00))
+                        break
+
+            if matched_task_id:
+                user_data = get_user_from_db(user_id)
+                if user_data:
+                    completed_list = user_data.get("completedTasksList", {}) or {}
+                    if completed_list.get(str(matched_task_id)) is True:
+                        cur_bal = float(user_data.get("balance", 0.0))
+                        cur_tasks_count = int(user_data.get("completedTasksCount", 0))
+                        u_lang = user_data.get("language", "bn")
+
+                        new_balance = max(0.0, cur_bal - task_reward)
+                        new_tasks_count = max(0, cur_tasks_count - 1)
+
+                        completed_list.pop(str(matched_task_id), None)
+
+                        update_user_in_db(user_id, {
+                            "balance": new_balance,
+                            "completedTasksCount": new_tasks_count,
+                            "completedTasksList": completed_list
+                        })
+
+                        notif_kb = types.InlineKeyboardMarkup(row_width=1)
+                        task_obj = all_tasks.get(matched_task_id)
+                        t_url = task_obj.get("link", task_obj.get("url", "https://t.me")) if task_obj else "https://t.me"
+                        
+                        if u_lang == "en":
+                            btn_rejoin = types.InlineKeyboardButton(text="👉 Re-join Now 🚀", url=t_url)
+                            btn_reverify = types.InlineKeyboardButton(text="✅ Verify to Reclaim Reward 🔄", callback_data=f"verify_{matched_task_id}")
+                            notif_msg = f"""⚠️ <b>Warning! Reward deducted for leaving channel!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>❌ You left our official channel/group!
+
+📉 <b>Deducted Amount:</b> <b>- ৳ {task_reward:.2f} BDT</b>
+💵 <b>Current Balance:</b> <b>৳ {new_balance:.2f} BDT</b></blockquote>
+
+👇 <i>Re-join and verify to get your reward back:</i>"""
+                        else:
+                            btn_rejoin = types.InlineKeyboardButton(text="👉 এখনই পুনরায় জয়েন করুন 🚀", url=t_url)
+                            btn_reverify = types.InlineKeyboardButton(text="✅ ভেরিফাই করে টাকা ফিরিয়ে নিন 🔄", callback_data=f"verify_{matched_task_id}")
+                            notif_msg = f"""⚠️ <b>সতর্কবার্তা! চ্যানেল থেকে লিভ নেওয়ার কারণে রিওয়ার্ড কাটা হয়েছে!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>❌ আপনি আমাদের অফিশিয়াল চ্যানেল/গ্রুপ থেকে বের হয়ে গেছেন!
+
+📉 <b>কর্তনকৃত পরিমাণ:</b> <b>- ৳ {task_reward:.2f} টাকা</b>
+💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
+
+👇 <i>টাকা পুনরায় ওয়ালেটে ফেরত পেতে নিচের বাটনে ক্লিক করে আবার জয়েন করুন এবং ভেরিফাই করুন:</i>"""
+
+                        notif_kb.add(btn_rejoin, btn_reverify)
+                        bot.send_message(int(user_id), notif_msg, reply_markup=notif_kb)
+    except Exception as e:
+        print(f"Chat Member Update Error: {e}")
+
+@bot.message_handler(func=lambda msg: msg.text in ["📋 ট্যাক্স সম্পূর্ণ করুন", "📋 Complete Tasks"])
+def task_dashboard_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    user_data = get_user_from_db(user_id) or {}
+    completed_tasks_list = user_data.get("completedTasksList", {}) or {}
+
+    all_tasks = get_all_tasks_from_db()
+
+    if not all_tasks:
+        normal_webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
+        no_task_kb = types.InlineKeyboardMarkup()
+        btn_txt = "📱 Open App Tasks" if lang == "en" else "📱 আর্নিং অ্যাপে টাস্ক দেখুন"
+        no_task_kb.add(types.InlineKeyboardButton(btn_txt, web_app=types.WebAppInfo(url=normal_webapp_url)))
+        
+        no_task_text = """📋 <b>Social Tasks Dashboard</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>No new tasks available in bot. Check the mini-app for more tasks!</blockquote>""" if lang == "en" else """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>বর্তমানে বটে কোনো নতুন ট্যাক্স নেই। অ্যাপ থেকে নতুন ট্যাক্স চেক করুন!</blockquote>"""
+        
+        bot.send_message(message.chat.id, no_task_text, reply_markup=no_task_kb)
+        return
+
+    if lang == "en":
+        msg_text = """📋 <b>Social Tasks Dashboard</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ <b>Instructions:</b>
+1. Click the links below and join the channels/groups.
+2. Tap on <b>'✅ Verify'</b> button after joining.
+3. Reward will be added instantly to your wallet!
+⚠️ <i>Warning: Leaving the channel later will deduct the reward immediately.</i></blockquote>\n"""
+    else:
+        msg_text = """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>⚡ <b>কাজের নিয়মাবলী:</b>
+১. নিচের লিংকগুলোতে ক্লিক করে চ্যানেল/গ্রুপে জয়েন করুন।
+২. জয়েন সম্পন্ন হলে <b>'✅ ভেরিফাই করুন'</b> বাটনে চাপ দিন।
+৩. ভেরিফাই হওয়ামাত্রই বোনাস ব্যালেন্সে যুক্ত হবে!
+⚠️ <i>সতর্কতা: জয়েন করার পর চ্যানেল বা গ্রুপ থেকে লিভ নিলে সাথে সাথেই আপনার ব্যালেন্স থেকে সমপরিমাণ টাকা কেটে নেওয়া হবে।</i></blockquote>\n"""
+
+    task_kb = types.InlineKeyboardMarkup(row_width=1)
+    pending_tasks_count = 0
+
+    for task_id, task in all_tasks.items():
+        if isinstance(task, dict):
+            if completed_tasks_list.get(str(task_id)) is True:
+                continue
+
+            pending_tasks_count += 1
+            title = task.get("title", f"Task #{task_id}")
+            reward = float(task.get("reward", 5.00))
+            link = task.get("link", task.get("url", "https://t.me"))
+
+            btn_link = types.InlineKeyboardButton(text=f"👉 {title} (৳ {reward:.2f})", url=link)
+            v_title = f"✅ Verify ({title})" if lang == "en" else f"✅ ভেরিফাই করুন ({title})"
+            btn_verify = types.InlineKeyboardButton(text=v_title, callback_data=f"verify_{task_id}")
+            
+            task_kb.add(btn_link, btn_verify)
+
+    if pending_tasks_count == 0:
+        congrats_text = "🎉 <b>Congratulations! You have completed all tasks!</b>\nNew tasks will appear here when added." if lang == "en" else "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন।"
+        bot.send_message(message.chat.id, congrats_text, reply_markup=get_main_keyboard(user_id, lang=lang))
+    else:
+        bot.send_message(message.chat.id, msg_text, reply_markup=task_kb, disable_web_page_preview=True)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
+def verify_task_callback(call):
+    user_id = str(call.from_user.id)
+    lang = get_user_lang(user_id)
+    task_id = call.data.replace("verify_", "")
+
+    user_data = get_user_from_db(user_id) or {}
+    completed_tasks_list = user_data.get("completedTasksList", {}) or {}
+
+    if completed_tasks_list.get(str(task_id)) is True:
+        alr_txt = "⚠️ You have already completed this task!" if lang == "en" else "⚠️ আপনি এই ট্যাক্সটি আগেই সম্পূর্ণ করেছেন!"
+        bot.answer_callback_query(call.id, alr_txt, show_alert=True)
+        return
+
+    tasks = get_all_tasks_from_db()
+    task = tasks.get(task_id)
+
+    if not task:
+        not_found_txt = "❌ Task is no longer active!" if lang == "en" else "❌ ট্যাক্সটি আর সক্রিয় নেই!"
+        bot.answer_callback_query(call.id, not_found_txt, show_alert=True)
+        return
+
+    task_reward = float(task.get("reward", 5.00))
+    task_title = task.get("title", "Task")
+    task_link = task.get("link", task.get("url", ""))
+
+    channel_username = extract_telegram_username(task_link)
+    
+    if channel_username:
+        is_member = verify_telegram_membership(channel_username, user_id)
+        if not is_member:
+            not_join_txt = "❌ You have not joined the channel yet! Please join first and then verify." if lang == "en" else "❌ আপনি এখনো চ্যানেলে জয়েন করেননি! আগে জয়েন করুন, তারপর ভেরিফাই বাটনে চাপুন।"
+            bot.answer_callback_query(call.id, not_join_txt, show_alert=True)
+            return
+
+    cur_bal = float(user_data.get("balance", 0.0))
+    cur_tasks_count = int(user_data.get("completedTasksCount", 0))
+
+    new_balance = cur_bal + task_reward
+    new_tasks_count = cur_tasks_count + 1
+
+    update_user_in_db(user_id, {
+        "balance": new_balance,
+        "completedTasksCount": new_tasks_count,
+        f"completedTasksList/{task_id}": True
+    })
+
+    toast_txt = f"🎉 Success! +৳ {task_reward:.2f} added to your wallet!" if lang == "en" else f"🎉 অভিনন্দন! +৳ {task_reward:.2f} টাকা ওয়ালেটে যোগ হয়েছে!"
+    bot.answer_callback_query(call.id, toast_txt, show_alert=True)
+
+    if lang == "en":
+        success_text = f"""✅ <b>Task Completed Successfully!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🎯 <b>Task:</b> {task_title}
+💰 <b>Reward:</b> <b>+ ৳ {task_reward:.2f} BDT</b>
+💵 <b>Current Balance:</b> <b>৳ {new_balance:.2f} BDT</b></blockquote>
+
+⚡ <i>Reward has been credited directly to your wallet!</i>"""
+    else:
+        success_text = f"""✅ <b>ট্যাক্স সফলভাবে সম্পন্ন হয়েছে!</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🎯 <b>ট্যাক্স:</b> {task_title}
+💰 <b>রিওয়ার্ড:</b> <b>+ ৳ {task_reward:.2f} টাকা</b>
+💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
+
+⚡ <i>টাকাটি সরাসরি আপনার মিনি অ্যাপ ও বটের ওয়ালেটে যুক্ত হয়েছে!</i>"""
+
+    bot.send_message(call.message.chat.id, success_text)
+
+# =================================================================
+# ৫. ব্যালেন্স বাটন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["💰 ব্যালেন্স 💎", "💰 Balance 💎", "/balance"])
+def balance_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    user_name = message.from_user.first_name or "User"
+    webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
+
+    user_data = get_user_from_db(user_id) or {}
+    balance = float(user_data.get("balance", 0.00))
+    ads_watched = int(user_data.get("adsWatched", 0))
+    referrals = int(user_data.get("referrals", 0))
+    tasks_done = int(user_data.get("completedTasksCount", 0))
+
+    bal_kb = types.InlineKeyboardMarkup(row_width=1)
+    btn_text = "💳 Wallet & Cashout 💸" if lang == "en" else "💳 ওয়ালেট ও টাকা উইথড্র 💸"
+    bal_kb.add(types.InlineKeyboardButton(text=btn_text, web_app=types.WebAppInfo(url=webapp_url)))
+
+    if lang == "en":
+        msg_text = f"""👤 <b>Live Account Dashboard</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🏷️ <b>Name:</b> {user_name}
+🆔 <b>ID:</b> <code>{user_id}</code>
+
+💵 <b>Main Balance:</b> <b>৳ {balance:.2f}</b> BDT
+👥 <b>Total Referrals:</b> <b>{referrals}</b> Members
+🎬 <b>Today's Watched Ads:</b> <b>{ads_watched}</b>
+✅ <b>Tasks Completed:</b> <b>{tasks_done}</b></blockquote>
+
+📌 <i>Tap the button below to withdraw to bKash or Nagad:</i>"""
+    else:
+        msg_text = f"""👤 <b>লাইভ একাউন্ট ড্যাশবোর্ড</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🏷️ <b>নাম:</b> {user_name}
+🆔 <b>আইডি:</b> <code>{user_id}</code>
+
+💵 <b>মূল ব্যালেন্স:</b> <b>৳ {balance:.2f}</b> টাকা
+👥 <b>মোট সফল রেফার:</b> <b>{referrals}</b> জন
+🎬 <b>আজকের দেখা ভিডিও:</b> <b>{ads_watched}</b> টি
+✅ <b>ট্যাক্স সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
+
+📌 <i>বিকাশ বা নগদে টাকা তুলতে নিচের বাটনে চাপুন:</i>"""
+
+    bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
+
+# =================================================================
+# ৬. রেফার বাটন হ্যান্ডলার (Bilingual & Clean Share Link)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["👥 রেফার 🎁", "👥 Refer 🎁", "/refer"])
+def refer_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
+
+    cfg = get_settings_from_db()
+    current_refer_reward = float(cfg.get("referReward") or cfg.get("refer_reward") or REFER_REWARD)
+
+    user_data = get_user_from_db(user_id) or {}
+    total_refs = int(user_data.get("referrals", 0))
+    earned_from_refs = total_refs * current_refer_reward
+
+    ref_kb = types.InlineKeyboardMarkup(row_width=1)
+
+    if lang == "en":
+        share_text = f"🔥 Join MH EARNING BOT and start earning money!\n🚀 Earn ৳ {current_refer_reward:.2f} instant bonus per refer!"
+        share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+        btn_share = types.InlineKeyboardButton(text="📢 Share Referral Link 🚀", url=share_url)
+        
+        msg_text = f"""👥 <b>Referral Income Center</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🎁 <b>Bonus Per Refer:</b> <b>৳ {current_refer_reward:.2f}</b> BDT!
+📊 <b>Total Referrals:</b> <b>{total_refs}</b> Members
+💰 <b>Total Refer Earnings:</b> <b>৳ {earned_from_refs:.2f}</b> BDT</blockquote>
+
+🔗 <b>Your Personal Referral Link:</b>
+<code>{referral_link}</code>
+
+<i>(Tap the link to copy)</i>"""
+    else:
+        share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা ইনস্ট্যান্ট বোনাস!"
+        share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+        btn_share = types.InlineKeyboardButton(text="📢 রেফার লিংক বন্ধুদের শেয়ার 🚀", url=share_url)
+
+        msg_text = f"""👥 <b>রেফারেল ইনকাম সেন্টার</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🎁 <b>প্রতি রেফারে বোনাস:</b> <b>৳ {current_refer_reward:.2f}</b> টাকা!
+📊 <b>সর্বমোট রেফারেল:</b> <b>{total_refs}</b> জন
+💰 <b>রেফার থেকে আয়:</b> <b>৳ {earned_from_refs:.2f}</b> টাকা</blockquote>
+
+🔗 <b>আপনার পার্সোনাল রেফার লিংক:</b>
+<code>{referral_link}</code>
+
+<i>(লিংকটিতে একবার ট্যাপ করলেই কপি হয়ে যাবে)</i>"""
+
+    ref_kb.add(btn_share)
+    bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
+
+# =================================================================
+# 🏆 লিডারবোর্ড সাব-মেন্যু ওপেন বাটন (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🏆 লিডারবোর্ড", "🏆 Leaderboard", "/leaderboard"])
+def leaderboard_menu_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+
+    if lang == "en":
+        text = """🏆 <b>Leaderboard & Referral Ranking Hub</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🌟 <i>View top earners and your own successful referrals:</i>
+
+🥇 <b>Top 10 Leaderboard:</b> Top 10 members with highest referrals
+👥 <b>My Referrals:</b> List of your referred members and their balance
+🔙 <b>Back:</b> Return to main menu</blockquote>
+
+👇 <i>Select an option from the keyboard below:</i>"""
+    else:
+        text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং হাব</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
+
+🥇 <b>টপ ১০ লিডারবোর্ড:</b> শীর্ষ ১০ জন রেফারকারীর তালিকা
+👥 <b>আমার রেফারেল:</b> আপনার রেফার করা সদস্যদের নাম ও বর্তমান ব্যালেন্স
+🔙 <b>ব্যাক:</b> পূর্ববর্তী মূল মেন্যুতে ফিরে যান</blockquote>
+
+👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
+
+    bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard(lang=lang))
+
+# =================================================================
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (Bilingual & 1 Line Format)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "🏆 Top 10 Leaderboard", "টপ ১০", "top 10"])
+def top_10_leaderboard_handler(message):
+    current_uid = str(message.from_user.id)
+    lang = get_user_lang(current_uid)
+    all_users = get_all_users_from_db()
+
+    user_list = []
+    for uid, udata in all_users.items():
+        if isinstance(udata, dict):
+            refs = int(udata.get("referrals", 0))
+            name = udata.get("name", "User")
+            user_list.append({"id": str(uid), "name": name, "refs": refs})
+
+    user_list.sort(key=lambda x: x["refs"], reverse=True)
+    top_10 = user_list[:10]
+
+    user_rank = "N/A"
+    user_refs = 0
+    for idx, u in enumerate(user_list, 1):
+        if u["id"] == current_uid:
+            user_rank = f"#{idx}"
+            user_refs = u["refs"]
+            break
+
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    leader_lines = []
+
+    for idx, usr in enumerate(top_10):
+        badge = medals[idx] if idx < len(medals) else f"{idx+1}."
+        aligned_name = format_aligned_name(usr['name'], total_width=11)
+        ref_cnt = usr['refs']
+        
+        unit = "Refers" if lang == "en" else "রেফার"
+        leader_lines.append(f"{badge} <code>{aligned_name}</code> <b>{ref_cnt} {unit}</b>")
+
+    if not leader_lines:
+        empty_msg = "<i>No leaderboard data found currently!</i>" if lang == "en" else "<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>"
+        leader_lines.append(empty_msg)
+
+    top_text = "\n".join(leader_lines)
+
+    if lang == "en":
+        res_msg = f"""🏆 <b>Top 10 Referral Leaderboard</b> 🌟
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>👑 <b>Top 10 Leaders:</b>
+
+{top_text}
+
+─────────────────────────
+👤 <b>Your Rank:</b> <b>{user_rank}</b>
+👥 <b>Your Total Referrals:</b> <b>{user_refs} Members</b></blockquote>
+
+🚀 <i>Refer more members to climb up the leaderboard and win rewards!</i>"""
+    else:
+        res_msg = f"""🏆 <b>টপ ১০ রেফার লিডারবোর্ড</b> 🌟
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্য:</b>
+
+{top_text}
+
+─────────────────────────
+👤 <b>আপনার অবস্থান:</b> <b>{user_rank}</b>
+👥 <b>আপনার মোট রেফার:</b> <b>{user_refs} জন</b></blockquote>
+
+🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন আকর্ষণীয় বোনাস!</i>"""
+
+    bot.send_message(message.chat.id, res_msg)
+
+# =================================================================
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (Bilingual & 1 Line Format)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "👥 My Referrals", "আমার রেফারেল", "my referrals"])
+def my_referrals_list_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    user_data = get_user_from_db(user_id) or {}
+    total_refs_count = int(user_data.get("referrals", 0))
+
+    try:
+        ref_url = f"{FIREBASE_DB_URL}/users/{user_id}/myReferrals.json"
+        res = requests.get(ref_url, timeout=5)
+        my_refs_dict = res.json() if (res.status_code == 200 and res.json()) else {}
+    except Exception:
+        my_refs_dict = {}
+
+    all_users = get_all_users_from_db()
+
+    if not my_refs_dict:
+        my_refs_dict = {uid: u for uid, u in all_users.items() if isinstance(u, dict) and str(u.get("referredBy")) == user_id}
+
+    ref_items = []
+    for ref_uid, v in my_refs_dict.items():
+        live_ref_user = all_users.get(str(ref_uid), {}) if isinstance(all_users, dict) else {}
+        
+        name = live_ref_user.get("name") or (v.get("name") if isinstance(v, dict) else "User")
+        balance = float(live_ref_user.get("balance", 0.0))
+        joined_at = live_ref_user.get("joinedAt") or (v.get("joinedAt") if isinstance(v, dict) else 0)
+
+        ref_items.append({
+            "id": str(ref_uid),
+            "name": name,
+            "balance": balance,
+            "joinedAt": joined_at
+        })
+
+    ref_items.sort(key=lambda x: (x["balance"], x["joinedAt"]), reverse=True)
+    top_my_refs = ref_items[:10]
+
+    if not top_my_refs:
+        if lang == "en":
+            no_ref_text = """👥 <b>My Referral List</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>📊 <b>Total Referrals:</b> <b>0 Members</b>
+❌ <i>You haven't referred anyone yet!</i></blockquote>
+
+👉 <i>Share your referral link now to earn ৳ 50.00 instant bonus!</i>"""
+        else:
+            no_ref_text = """👥 <b>আমার রেফারেল তালিকা</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>📊 <b>আপনার মোট রেফার:</b> <b>০ জন</b>
+❌ <i>আপনি এখনো কাউকে রেফার করেননি!</i></blockquote>
+
+👉 <i>রেফার লিংক শেয়ার করে এখনই ৫০ টাকা করে বোনাস আয় শুরু করুন!</i>"""
+        bot.send_message(message.chat.id, no_ref_text)
+        return
+
+    ref_lines = []
+    for idx, r in enumerate(top_my_refs, 1):
+        aligned_name = format_aligned_name(r['name'], total_width=11)
+        bal = r['balance']
+        ref_lines.append(f"<b>{idx}.</b> <code>{aligned_name}</code> <b>৳{bal:.2f}</b>")
+
+    joined_list_str = "\n".join(ref_lines)
+
+    if lang == "en":
+        my_ref_text = f"""👥 <b>My Referred Members List</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>📊 <b>Total Referrals:</b> <b>{total_refs_count} Members</b>
+
+{joined_list_str}</blockquote>
+
+⚡ <i>Live real-time balance of your referrals is shown above!</i>"""
+    else:
+        my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>📊 <b>আপনার সর্বমোট রেফার:</b> <b>{total_refs_count} জন</b>
+
+{joined_list_str}</blockquote>
+
+⚡ <i>আপনার রেফারেল সদস্যদের রিয়েলটাইম লাইভ ব্যালেন্স প্রদর্শিত হচ্ছে!</i>"""
+
+    bot.send_message(message.chat.id, my_ref_text)
+
+# =================================================================
+# ৭. সাপোর্ট বাটন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🛠️ সাপোর্ট 💬", "🛠️ Support 💬", "/support"])
+def support_handler(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+
+    sup_kb = types.InlineKeyboardMarkup(row_width=1)
+    btn_admin_text = "👨‍💻 Admin Live Support 💬" if lang == "en" else "👨‍💻 এডমিন লাইভ সাপোর্ট 💬"
+    sup_kb.add(types.InlineKeyboardButton(text=btn_admin_text, url=f"https://t.me/{SUPPORT_USERNAME}"))
+
+    if lang == "en":
+        msg_text = f"""🛠️ <b>Help & Support Center</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>For any help regarding cashout or tasks, talk directly with our official admin.
+
+⏰ <b>Support Hours:</b> 9:00 AM - 11:00 PM
+👤 <b>Official Admin:</b> @{SUPPORT_USERNAME}</blockquote>
+
+👇 <i>Tap the button below to message admin:</i>"""
+    else:
+        msg_text = f"""🛠️ <b>হেল্প ও সাপোর্ট সেন্টার</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>পেমেন্ট বা কাজ সংক্রান্ত যেকোনো সহায়তার জন্য সরাসরি আমাদের অফিসিয়াল এডমিনের সাথে কথা বলুন।
+
+⏰ <b>সাপোর্ট সময়:</b> সকাল ৯:০০ টা - রাত ১১:০০ টা
+👤 <b>অফিসিয়াল এডমিন:</b> @{SUPPORT_USERNAME}</blockquote>
+
+👇 <i>এডমিনকে মেসেজ দিতে নিচের বাটনে ট্যাপ করুন:</i>"""
+
+    bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
+
+# =================================================================
+# ৮. সাধারণ ব্যাক বাটন হ্যান্ডলার (Bilingual)
+# =================================================================
+@bot.message_handler(func=lambda msg: msg.text in ["🔙 ব্যাক", "🔙 Back", "ব্যাক", "back", "মেন্যু", "menu", "<-"])
+def back_to_main_menu(message):
+    user_id = str(message.from_user.id)
+    lang = get_user_lang(user_id)
+    back_txt = "🏠 <b>Returned to main menu:</b>" if lang == "en" else "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>"
+    bot.send_message(message.chat.id, back_txt, reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
 # 👑 অ্যাডমিন প্যানেল ওপেন হ্যান্ডলার
@@ -629,7 +1297,8 @@ def admin_broadcast_prompt(message):
 @bot.message_handler(func=lambda msg: msg.text == "🏠 ইউজার মেন্যুতে যান")
 def admin_back_to_user_menu(message):
     user_id = str(message.from_user.id)
-    bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
+    lang = get_user_lang(user_id)
+    bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
 # 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস
@@ -883,491 +1552,23 @@ def handle_tx_decision(call):
         bot.answer_callback_query(call.id, f"Error: {e}", show_alert=True)
 
 # =================================================================
-# ২. কাজের বাটন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text == "💼 কাজ ⚡")
-def work_options_handler(message):
-    reply_text = """💼 <b>কাজের অপশন সিলেক্ট করুন</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ আপনি দুইভাবে কাজ করে প্রতিদিন টাকা আয় করতে পারবেন:
-
-🎬 <b>ভিডিও এড দেখুন:</b> ছোট ছোট বিজ্ঞাপন দেখে ইনস্ট্যান্ট ওয়ালেটে টাকা যোগ করুন।
-📋 <b>ট্যাক্স সম্পূর্ণ করুন:</b> সোশ্যাল চ্যানেলে যুক্ত হয়ে বড় অংকের রিওয়ার্ড জিতে নিন।</blockquote>
-
-👇 <i>নিচের কিবোর্ড থেকে যেকোনো একটি অপশন বেছে নিন:</i>"""
-
-    bot.send_message(message.chat.id, reply_text, reply_markup=get_work_keyboard())
-
-# =================================================================
-# ৩. ভিডিও এড দেখুন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text == "🎬 ভিডিও এড দেখুন")
-def video_ad_handler(message):
-    user_id = str(message.from_user.id)
-    user_data = get_user_from_db(user_id) or {}
-    ads_watched = int(user_data.get("adsWatched", 0))
-
-    cfg = get_settings_from_db()
-    current_ad_reward = float(cfg.get("adReward") or cfg.get("ad_reward") or AD_REWARD)
-    current_daily_limit = int(cfg.get("dailyAdLimit") or cfg.get("daily_ad_limit") or 10)
-
-    server1_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=1&tgWebAppStartParam={user_id}"
-    server2_webapp_url = f"{MINI_APP_URL}#action=watch_ad&server=2&tgWebAppStartParam={user_id}"
-
-    ad_kb = types.InlineKeyboardMarkup(row_width=2)
-    btn_server1 = types.InlineKeyboardButton(text="▶️ Server 1 ⚡", web_app=types.WebAppInfo(url=server1_webapp_url))
-    btn_server2 = types.InlineKeyboardButton(text="▶️ Server 2 ⚡", web_app=types.WebAppInfo(url=server2_webapp_url))
-    ad_kb.add(btn_server1, btn_server2)
-
-    msg_text = f"""🎬 <b>প্রিমিয়াম ভিডিও বিজ্ঞাপন জোন</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>💎 <b>বিজ্ঞাপন রিওয়ার্ড:</b> <b>৳ {current_ad_reward:.2f} টাকা</b> প্রতি ভিডিও!
-📊 <b>আজকের দেখা ভিডিও:</b> <b>{ads_watched} / {current_daily_limit}</b> টি
-
-⚡ <b>নিয়মাবলী:</b>
-১. নিচের <b>Server 1</b> অথবা <b>Server 2</b> বাটনে চাপ দিন।
-২. বিজ্ঞাপনটি সম্পূর্ণ শেষ হওয়া পর্যন্ত দেখুন।
-৩. দেখা শেষ হওয়ামাত্রই টাকা সরাসরি মূল ওয়ালেটে যুক্ত হবে।</blockquote>
-
-👇 <i>যেকোনো একটি সার্ভার নির্বাচন করে এড দেখুন:</i>"""
-
-    bot.send_message(message.chat.id, msg_text, reply_markup=ad_kb, disable_web_page_preview=True)
-
-# =================================================================
-# ৪. ট্যাক্স সম্পূর্ণ করুন এবং রিয়েল-টাইম চ্যানেল লিভ ডিটেকশন হ্যান্ডলার
-# =================================================================
-@bot.chat_member_handler()
-def handle_chat_member_update(update: types.ChatMemberUpdated):
-    try:
-        chat = update.chat
-        user = update.new_chat_member.user
-        user_id = str(user.id)
-
-        old_status = update.old_chat_member.status
-        new_status = update.new_chat_member.status
-
-        was_in_chat = old_status in ['member', 'administrator', 'creator', 'restricted']
-        is_now_in_chat = new_status in ['member', 'administrator', 'creator', 'restricted']
-
-        if was_in_chat and not is_now_in_chat:
-            chat_username = chat.username
-            if not chat_username:
-                return
-
-            all_tasks = get_all_tasks_from_db()
-            matched_task_id = None
-            task_reward = 0.0
-
-            for tid, t in all_tasks.items():
-                if isinstance(t, dict):
-                    t_link = t.get("link", t.get("url", ""))
-                    c_uname = extract_telegram_username(t_link)
-                    if c_uname and c_uname.lower() == chat_username.lower():
-                        matched_task_id = tid
-                        task_reward = float(t.get("reward", 5.00))
-                        break
-
-            if matched_task_id:
-                user_data = get_user_from_db(user_id)
-                if user_data:
-                    completed_list = user_data.get("completedTasksList", {}) or {}
-                    if completed_list.get(str(matched_task_id)) is True:
-                        cur_bal = float(user_data.get("balance", 0.0))
-                        cur_tasks_count = int(user_data.get("completedTasksCount", 0))
-
-                        new_balance = max(0.0, cur_bal - task_reward)
-                        new_tasks_count = max(0, cur_tasks_count - 1)
-
-                        completed_list.pop(str(matched_task_id), None)
-
-                        update_user_in_db(user_id, {
-                            "balance": new_balance,
-                            "completedTasksCount": new_tasks_count,
-                            "completedTasksList": completed_list
-                        })
-
-                        notif_kb = types.InlineKeyboardMarkup(row_width=1)
-                        task_obj = all_tasks.get(matched_task_id)
-                        t_url = task_obj.get("link", task_obj.get("url", "https://t.me")) if task_obj else "https://t.me"
-                        
-                        btn_rejoin = types.InlineKeyboardButton(text="👉 এখনই পুনরায় জয়েন করুন 🚀", url=t_url)
-                        btn_reverify = types.InlineKeyboardButton(text="✅ ভেরিফাই করে টাকা ফিরিয়ে নিন 🔄", callback_data=f"verify_{matched_task_id}")
-                        notif_kb.add(btn_rejoin, btn_reverify)
-
-                        notif_msg = f"""⚠️ <b>সতর্কবার্তা! চ্যানেল থেকে লিভ নেওয়ার কারণে রিওয়ার্ড কাটা হয়েছে!</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>❌ আপনি আমাদের অফিশিয়াল চ্যানেল/গ্রুপ থেকে বের হয়ে গেছেন!
-
-📉 <b>কর্তনকৃত পরিমাণ:</b> <b>- ৳ {task_reward:.2f} টাকা</b>
-💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
-
-👇 <i>টাকা পুনরায় ওয়ালেটে ফেরত পেতে নিচের বাটনে ক্লিক করে আবার জয়েন করুন এবং ভেরিফাই করুন:</i>"""
-
-                        bot.send_message(int(user_id), notif_msg, reply_markup=notif_kb)
-    except Exception as e:
-        print(f"Chat Member Update Error: {e}")
-
-@bot.message_handler(func=lambda msg: msg.text == "📋 ট্যাক্স সম্পূর্ণ করুন")
-def task_dashboard_handler(message):
-    user_id = str(message.from_user.id)
-    user_data = get_user_from_db(user_id) or {}
-    completed_tasks_list = user_data.get("completedTasksList", {}) or {}
-
-    all_tasks = get_all_tasks_from_db()
-
-    if not all_tasks:
-        normal_webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
-        no_task_kb = types.InlineKeyboardMarkup()
-        no_task_kb.add(types.InlineKeyboardButton("📱 আর্নিং অ্যাপে টাস্ক দেখুন", web_app=types.WebAppInfo(url=normal_webapp_url)))
-        
-        bot.send_message(
-            message.chat.id,
-            """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>বর্তমানে বটে কোনো নতুন ট্যাক্স নেই। অ্যাপ থেকে নতুন ট্যাক্স চেক করুন!</blockquote>""",
-            reply_markup=no_task_kb
-        )
-        return
-
-    msg_text = """📋 <b>সোশ্যাল ট্যাক্স ড্যাশবোর্ড</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>⚡ <b>কাজের নিয়মাবলী:</b>
-১. নিচের লিংকগুলোতে ক্লিক করে চ্যানেল/গ্রুপে জয়েন করুন।
-২. জয়েন সম্পন্ন হলে <b>'✅ ভেরিফাই করুন'</b> বাটনে চাপ দিন।
-৩. ভেরিফাই হওয়ামাত্রই বোনাস ব্যালেন্সে যুক্ত হবে!
-⚠️ <i>সতর্কতা: জয়েন করার পর চ্যানেল বা গ্রুপ থেকে লিভ নিলে সাথে সাথেই আপনার ব্যালেন্স থেকে সমপরিমাণ টাকা কেটে নেওয়া হবে।</i></blockquote>\n"""
-
-    task_kb = types.InlineKeyboardMarkup(row_width=1)
-    
-    pending_tasks_count = 0
-    for task_id, task in all_tasks.items():
-        if isinstance(task, dict):
-            if completed_tasks_list.get(str(task_id)) is True:
-                continue
-
-            pending_tasks_count += 1
-            title = task.get("title", f"ট্যাক্স #{task_id}")
-            reward = float(task.get("reward", 5.00))
-            link = task.get("link", task.get("url", "https://t.me"))
-
-            btn_link = types.InlineKeyboardButton(text=f"👉 {title} (৳ {reward:.2f})", url=link)
-            btn_verify = types.InlineKeyboardButton(text=f"✅ ভেরিফাই করুন ({title})", callback_data=f"verify_{task_id}")
-            
-            task_kb.add(btn_link, btn_verify)
-
-    if pending_tasks_count == 0:
-        bot.send_message(
-            message.chat.id, 
-            "🎉 <b>অভিনন্দন! আপনি অ্যাপ ও বটের সব ট্যাক্স সম্পন্ন করে ফেলেছেন!</b>\nনতুন ট্যাক্স যুক্ত হলে এখানে আবার দেখতে পাবেন।", 
-            reply_markup=get_main_keyboard(user_id)
-        )
-    else:
-        bot.send_message(message.chat.id, msg_text, reply_markup=task_kb, disable_web_page_preview=True)
-
-# টাস্ক ভেরিফাই Callback
-@bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
-def verify_task_callback(call):
-    user_id = str(call.from_user.id)
-    task_id = call.data.replace("verify_", "")
-
-    user_data = get_user_from_db(user_id) or {}
-    completed_tasks_list = user_data.get("completedTasksList", {}) or {}
-
-    if completed_tasks_list.get(str(task_id)) is True:
-        bot.answer_callback_query(call.id, "⚠️ আপনি এই ট্যাক্সটি আগেই সম্পূর্ণ করেছেন!", show_alert=True)
-        return
-
-    tasks = get_all_tasks_from_db()
-    task = tasks.get(task_id)
-
-    if not task:
-        bot.answer_callback_query(call.id, "❌ ট্যাক্সটি আর সক্রিয় নেই!", show_alert=True)
-        return
-
-    task_reward = float(task.get("reward", 5.00))
-    task_title = task.get("title", "ট্যাক্স")
-    task_link = task.get("link", task.get("url", ""))
-
-    channel_username = extract_telegram_username(task_link)
-    
-    if channel_username:
-        is_member = verify_telegram_membership(channel_username, user_id)
-        if not is_member:
-            bot.answer_callback_query(call.id, "❌ আপনি এখনো চ্যানেলে জয়েন করেননি! আগে জয়েন করুন, তারপর ভেরিফাই বাটনে চাপুন।", show_alert=True)
-            return
-
-    cur_bal = float(user_data.get("balance", 0.0))
-    cur_tasks_count = int(user_data.get("completedTasksCount", 0))
-
-    new_balance = cur_bal + task_reward
-    new_tasks_count = cur_tasks_count + 1
-
-    update_user_in_db(user_id, {
-        "balance": new_balance,
-        "completedTasksCount": new_tasks_count,
-        f"completedTasksList/{task_id}": True
-    })
-
-    bot.answer_callback_query(call.id, f"🎉 অভিনন্দন! +৳ {task_reward:.2f} টাকা ওয়ালেটে যোগ হয়েছে!", show_alert=True)
-
-    success_text = f"""✅ <b>ট্যাক্স সফলভাবে সম্পন্ন হয়েছে!</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>🎯 <b>ট্যাক্স:</b> {task_title}
-💰 <b>রিওয়ার্ড:</b> <b>+ ৳ {task_reward:.2f} টাকা</b>
-💵 <b>বর্তমান ব্যালেন্স:</b> <b>৳ {new_balance:.2f} টাকা</b></blockquote>
-
-⚡ <i>টাকাটি সরাসরি আপনার মিনি অ্যাপ ও বটের ওয়ালেটে যুক্ত হয়েছে!</i>"""
-
-    bot.send_message(call.message.chat.id, success_text)
-
-# =================================================================
-# ৫. ব্যালেন্স বাটন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["💰 ব্যালেন্স 💎", "/balance"])
-def balance_handler(message):
-    user_id = str(message.from_user.id)
-    user_name = message.from_user.first_name or "User"
-    webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
-
-    user_data = get_user_from_db(user_id) or {}
-    balance = float(user_data.get("balance", 0.00))
-    ads_watched = int(user_data.get("adsWatched", 0))
-    referrals = int(user_data.get("referrals", 0))
-    tasks_done = int(user_data.get("completedTasksCount", 0))
-
-    bal_kb = types.InlineKeyboardMarkup(row_width=1)
-    btn_open_wallet = types.InlineKeyboardButton(text="💳 ওয়ালেট ও টাকা উইথড্র 💸", web_app=types.WebAppInfo(url=webapp_url))
-    bal_kb.add(btn_open_wallet)
-
-    msg_text = f"""👤 <b>লাইভ একাউন্ট ড্যাশবোর্ড</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>🏷️ <b>নাম:</b> {user_name}
-🆔 <b>আইডি:</b> <code>{user_id}</code>
-
-💵 <b>মূল ব্যালেন্স:</b> <b>৳ {balance:.2f}</b> টাকা
-👥 <b>মোট সফল রেফার:</b> <b>{referrals}</b> জন
-🎬 <b>আজকের দেখা ভিডিও:</b> <b>{ads_watched}</b> টি
-✅ <b>ট্যাক্স সম্পন্ন:</b> <b>{tasks_done}</b> টি</blockquote>
-
-📌 <i>বিকাশ বা নগদে টাকা তুলতে নিচের বাটনে চাপুন:</i>"""
-
-    bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
-
-# =================================================================
-# ৬. রেফার বাটন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["👥 রেফার 🎁", "/refer"])
-def refer_handler(message):
-    user_id = str(message.from_user.id)
-    referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-
-    cfg = get_settings_from_db()
-    current_refer_reward = float(cfg.get("referReward") or cfg.get("refer_reward") or REFER_REWARD)
-
-    user_data = get_user_from_db(user_id) or {}
-    total_refs = int(user_data.get("referrals", 0))
-    earned_from_refs = total_refs * current_refer_reward
-
-    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা ইনস্ট্যান্ট বোনাস!"
-    share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
-
-    ref_kb = types.InlineKeyboardMarkup(row_width=1)
-    btn_share = types.InlineKeyboardButton(text="📢 রেফার লিংক বন্ধুদের শেয়ার 🚀", url=share_url)
-    ref_kb.add(btn_share)
-
-    msg_text = f"""👥 <b>রেফারেল ইনকাম সেন্টার</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>🎁 <b>প্রতি রেফারে বোনাস:</b> <b>৳ {current_refer_reward:.2f}</b> টাকা!
-📊 <b>সর্বমোট রেফারেল:</b> <b>{total_refs}</b> জন
-💰 <b>রেফার থেকে আয়:</b> <b>৳ {earned_from_refs:.2f}</b> টাকা</blockquote>
-
-🔗 <b>আপনার পার্সোনাল রেফার লিংক:</b>
-<code>{referral_link}</code>
-
-<i>(লিংকটিতে একবার ট্যাপ করলেই কপি হয়ে যাবে)</i>"""
-
-    bot.send_message(message.chat.id, msg_text, reply_markup=ref_kb, disable_web_page_preview=True)
-
-# =================================================================
-# 🏆 লিডারবোর্ড সাব-মেন্যু ওপেন বাটন
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["🏆 লিডারবোর্ড", "/leaderboard"])
-def leaderboard_menu_handler(message):
-    text = """🏆 <b>লিডারবোর্ড ও রেফারেল র‍্যাংকিং হাব</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
-
-🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> শীর্ষ ১০ জন রেফারকারীর তালিকা
-👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা সদস্যদের নাম ও বর্তমান ব্যালেন্স
-🔙 <b>/🔙 ব্যাক:</b> পূর্ববর্তী মূল মেন্যুতে ফিরে যান</blockquote>
-
-👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
-    bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
-
-# =================================================================
-# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (১ লাইনে সোজা ফর্মেট)
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
-def top_10_leaderboard_handler(message):
-    current_uid = str(message.from_user.id)
-    all_users = get_all_users_from_db()
-
-    user_list = []
-    for uid, udata in all_users.items():
-        if isinstance(udata, dict):
-            refs = int(udata.get("referrals", 0))
-            name = udata.get("name", "User")
-            user_list.append({"id": str(uid), "name": name, "refs": refs})
-
-    user_list.sort(key=lambda x: x["refs"], reverse=True)
-    top_10 = user_list[:10]
-
-    # নিজের বর্তমান অবস্থান ও রেফার
-    user_rank = "N/A"
-    user_refs = 0
-    for idx, u in enumerate(user_list, 1):
-        if u["id"] == current_uid:
-            user_rank = f"#{idx}"
-            user_refs = u["refs"]
-            break
-
-    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-
-    leader_lines = []
-    for idx, usr in enumerate(top_10):
-        badge = medals[idx] if idx < len(medals) else f"{idx+1}."
-        aligned_name = format_aligned_name(usr['name'], total_width=11)
-        ref_cnt = usr['refs']
-        
-        # ✅ ১ লাইনে কমপ্যাক্ট ফর্মেট: লাইন নিচে নামবে না
-        leader_lines.append(f"{badge} <code>{aligned_name}</code> <b>{ref_cnt} রেফার</b>")
-
-    if not leader_lines:
-        leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
-
-    top_text = "\n".join(leader_lines)
-
-    res_msg = f"""🏆 <b>টপ ১০ রেফার লিডারবোর্ড</b> 🌟
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্য:</b>
-
-{top_text}
-
-─────────────────────────
-👤 <b>আপনার অবস্থান:</b> <b>{user_rank}</b>
-👥 <b>আপনার মোট রেফার:</b> <b>{user_refs} জন</b></blockquote>
-
-🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন আকর্ষণীয় বোনাস!</i>"""
-
-    bot.send_message(message.chat.id, res_msg)
-
-# =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার (১ লাইনে সোজা ফর্মেট)
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
-def my_referrals_list_handler(message):
-    user_id = str(message.from_user.id)
-    user_data = get_user_from_db(user_id) or {}
-    total_refs_count = int(user_data.get("referrals", 0))
-
-    try:
-        ref_url = f"{FIREBASE_DB_URL}/users/{user_id}/myReferrals.json"
-        res = requests.get(ref_url, timeout=5)
-        my_refs_dict = res.json() if (res.status_code == 200 and res.json()) else {}
-    except Exception:
-        my_refs_dict = {}
-
-    all_users = get_all_users_from_db()
-
-    if not my_refs_dict:
-        my_refs_dict = {uid: u for uid, u in all_users.items() if isinstance(u, dict) and str(u.get("referredBy")) == user_id}
-
-    ref_items = []
-    for ref_uid, v in my_refs_dict.items():
-        live_ref_user = all_users.get(str(ref_uid), {}) if isinstance(all_users, dict) else {}
-        
-        name = live_ref_user.get("name") or (v.get("name") if isinstance(v, dict) else "User")
-        balance = float(live_ref_user.get("balance", 0.0))
-        joined_at = live_ref_user.get("joinedAt") or (v.get("joinedAt") if isinstance(v, dict) else 0)
-
-        ref_items.append({
-            "id": str(ref_uid),
-            "name": name,
-            "balance": balance,
-            "joinedAt": joined_at
-        })
-
-    ref_items.sort(key=lambda x: (x["balance"], x["joinedAt"]), reverse=True)
-    top_my_refs = ref_items[:10]
-
-    if not top_my_refs:
-        no_ref_text = f"""👥 <b>আমার রেফারেল তালিকা</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>📊 <b>আপনার মোট রেফার:</b> <b>০ জন</b>
-❌ <i>আপনি এখনো কাউকে রেফার করেননি!</i></blockquote>
-
-👉 <i>রেফার লিংক শেয়ার করে এখনই ৫০ টাকা করে বোনাস আয় শুরু করুন!</i>"""
-        bot.send_message(message.chat.id, no_ref_text)
-        return
-
-    ref_lines = []
-    for idx, r in enumerate(top_my_refs, 1):
-        aligned_name = format_aligned_name(r['name'], total_width=11)
-        bal = r['balance']
-        
-        # ✅ ১ লাইনে পারফেক্ট ফর্মেট: 1. Name..__ ৳4138.10
-        ref_lines.append(f"<b>{idx}.</b> <code>{aligned_name}</code> <b>৳{bal:.2f}</b>")
-
-    joined_list_str = "\n".join(ref_lines)
-
-    my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>📊 <b>আপনার সর্বমোট রেফার:</b> <b>{total_refs_count} জন</b>
-
-{joined_list_str}</blockquote>
-
-⚡ <i>আপনার রেফারেল সদস্যদের রিয়েলটাইম লাইভ ব্যালেন্স প্রদর্শিত হচ্ছে!</i>"""
-
-    bot.send_message(message.chat.id, my_ref_text)
-
-# =================================================================
-# ৭. সাপোর্ট বাটন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["🛠️ সাপোর্ট 💬", "/support"])
-def support_handler(message):
-    sup_kb = types.InlineKeyboardMarkup(row_width=1)
-    btn_admin = types.InlineKeyboardButton(text="👨‍💻 এডমিন লাইভ সাপোর্ট 💬", url=f"https://t.me/{SUPPORT_USERNAME}")
-    sup_kb.add(btn_admin)
-
-    msg_text = f"""🛠️ <b>হেল্প ও সাপোর্ট সেন্টার</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>পেমেন্ট বা কাজ সংক্রান্ত যেকোনো সহায়তার জন্য সরাসরি আমাদের অফিসিয়াল এডমিনের সাথে কথা বলুন।
-
-⏰ <b>সাপোর্ট সময়:</b> সকাল ৯:০০ টা - রাত ১১:০০ টা
-👤 <b>অফিসিয়াল এডমিন:</b> @{SUPPORT_USERNAME}</blockquote>
-
-👇 <i>এডমিনকে মেসেজ দিতে নিচের বাটনে ট্যাপ করুন:</i>"""
-
-    bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
-
-# =================================================================
-# ৮. সাধারণ ব্যাক বাটন হ্যান্ডলার
-# =================================================================
-@bot.message_handler(func=lambda msg: msg.text in ["🔙 ব্যাক", "/🔙 ব্যাক", "ব্যাক", "back", "মেন্যু", "<-"])
-def back_to_main_menu(message):
-    user_id = str(message.from_user.id)
-    bot.send_message(message.chat.id, "🏠 <b>মূল মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
-
-# =================================================================
 # ❓ অপরিচিত ও অনাকাঙ্ক্ষিত মেসেজ হ্যান্ডলার (Fallback Handler)
 # =================================================================
 @bot.message_handler(func=lambda msg: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker'])
 def fallback_unknown_message(message):
     user_id = str(message.from_user.id)
-    fallback_text = """🤖 <b>দুঃখিত! আপনি যা লিখেছেন তা আমি বুঝতে পারিনি।</b>
+    lang = get_user_lang(user_id)
+
+    if lang == "en":
+        fallback_text = """🤖 <b>Sorry! I couldn't understand your message.</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>💡 <i>Please select an option from the keyboard below or type <b>/start</b> to restart.</i></blockquote>"""
+    else:
+        fallback_text = """🤖 <b>দুঃখিত! আপনি যা লিখেছেন তা আমি বুঝতে পারিনি।</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>💡 <i>বটটি ব্যবহার করতে নিচের কিবোর্ড বাটনগুলো চেপে অপশন সিলেক্ট করুন অথবা পুনরায় শুরু করতে <b>/start</b> কমান্ডটি লিখুন।</i></blockquote>"""
-    bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id))
+
+    bot.send_message(message.chat.id, fallback_text, reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
 # 🚀 মেইন ইঞ্জিন রানার (Allowed Updates সহ)

@@ -173,7 +173,7 @@ def format_aligned_name(name, total_width=11):
     else:
         disp = clean_name + ".."
     
-    # বাকি অংশ _ দিয়ে সমান রাখা হবে যাতে প্রতিটি লাইন সোজা থাকে
+    # বাকি অংশ _ দিয়ে সমান রাখা হবে যাতে লাইন নিচে না নামে
     remaining = total_width - len(disp)
     if remaining > 0:
         disp += "_" * remaining
@@ -238,7 +238,8 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
                     btn_wallet = types.InlineKeyboardButton(text="💳 ওয়ালেট ব্যালেন্স", web_app=types.WebAppInfo(url=webapp_url))
                     
                     share_link = f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
-                    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n👉 জয়েন লিংক: {share_link}"
+                    # ✅ পরিচ্ছন্ন শেয়ার টেক্সট (লিংক ডুপ্লিকেট হবে না)
+                    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা বোনাস!"
                     share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
                     btn_more_ref = types.InlineKeyboardButton(text="📢 আরও রেফার", url=share_url)
 
@@ -354,7 +355,8 @@ def send_welcome(message):
     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
     btn_webapp = types.InlineKeyboardButton(text="🚀 ওপেন আর্নিং অ্যাপ 📱", web_app=types.WebAppInfo(url=webapp_url))
     
-    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ৫০ টাকা!\n\n👉 জয়েন লিংক: {referral_link}"
+    # ✅ পরিচ্ছন্ন শেয়ার লিংক (ডাবল লিংক মুক্ত)
+    share_text = "🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন ফ্রি টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ইনস্ট্যান্ট ৫০ টাকা বোনাস!"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
     btn_share = types.InlineKeyboardButton(text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url)
 
@@ -1105,7 +1107,8 @@ def refer_handler(message):
     total_refs = int(user_data.get("referrals", 0))
     earned_from_refs = total_refs * current_refer_reward
 
-    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n\n👉 রেফারেল লিংক: {referral_link}"
+    # ✅ পরিচ্ছন্ন শেয়ার মেসেজ (একবারই লিংক যাবে)
+    share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা ইনস্ট্যান্ট বোনাস!"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
 
     ref_kb = types.InlineKeyboardMarkup(row_width=1)

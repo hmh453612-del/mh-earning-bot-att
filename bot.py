@@ -204,6 +204,7 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
             "completedTasksCount": 0,
             "rejectedCount": 0,
             "completedTasksList": {},
+            "language": "bn",
             "joinedAt": int(now.timestamp() * 1000),
             "referredBy": referrer_id if (referrer_id and referrer_id != user_id_str) else None
         }
@@ -238,7 +239,6 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
                     btn_wallet = types.InlineKeyboardButton(text="💳 ওয়ালেট ব্যালেন্স", web_app=types.WebAppInfo(url=webapp_url))
                     
                     share_link = f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
-                    # ✅ পরিচ্ছন্ন শেয়ার টেক্সট (লিংক ডুপ্লিকেট হবে না)
                     share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা বোনাস!"
                     share_url = f"https://t.me/share/url?url={urllib.parse.quote(share_link)}&text={urllib.parse.quote(share_text)}"
                     btn_more_ref = types.InlineKeyboardButton(text="📢 আরও রেফার", url=share_url)
@@ -276,10 +276,11 @@ def get_main_keyboard(user_id=None):
     btn_refer = types.KeyboardButton("👥 রেফার 🎁")
     btn_leaderboard = types.KeyboardButton("🏆 লিডারবোর্ড")
     btn_support = types.KeyboardButton("🛠️ সাপোর্ট 💬")
+    btn_lang = types.KeyboardButton("🌐 ভাষা পরিবর্তন")
 
     keyboard.row(btn_task, btn_balance)
     keyboard.row(btn_refer, btn_leaderboard)
-    keyboard.row(btn_support)
+    keyboard.row(btn_support, btn_lang)
 
     if user_id and is_admin(user_id):
         btn_admin = types.KeyboardButton("👑 Admin Panel ⚙️")
@@ -332,7 +333,60 @@ def get_work_keyboard():
     return keyboard
 
 # =================================================================
-# ১. /start কমান্ড হ্যান্ডলার
+# 🌐 ভাষা নির্বাচন কিবোর্ড এবং ফাংশন
+# =================================================================
+def get_language_inline_keyboard():
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    btn_bn = types.InlineKeyboardButton("🇧🇩 বাংলা", callback_data="setlang_bn")
+    btn_en = types.InlineKeyboardButton("🇬🇧 English", callback_data="setlang_en")
+    kb.add(btn_bn, btn_en)
+    return kb
+
+def send_main_dashboard(chat_id, user_id, lang="bn"):
+    referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
+
+    inline_kb = types.InlineKeyboardMarkup(row_width=1)
+    webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
+    btn_webapp = types.InlineKeyboardButton(text="🚀 ওপেন আর্নিং অ্যাপ 📱", web_app=types.WebAppInfo(url=webapp_url))
+    
+    share_text = "🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন ফ্রি টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ইনস্ট্যান্ট ৫০ টাকা বোনাস!"
+    share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+    btn_share = types.InlineKeyboardButton(text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url)
+
+    inline_kb.add(btn_webapp, btn_share)
+
+    if lang == "en":
+        welcome_text = f"""👑 <b>MH EARNING BOT PREMIER</b> 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>✨ <b>The premier platform to earn money easily from home!</b>
+
+✅ <b>Watch video ads & earn unlimited</b>
+✅ <b>Complete social tasks for big rewards</b>
+✅ <b>Instant ৳ 50.00 per referral</b>
+✅ <b>Direct auto withdraw to bKash & Nagad</b></blockquote>
+
+🔗 <b>Your Personal Referral Link:</b>
+<code>{referral_link}</code>"""
+        hint_text = "👇 <b>Choose an option from the menu below:</b>"
+    else:
+        welcome_text = f"""👑 <b>MH EARNING BOT PREMIER</b> 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>✨ <b>ঘরে বসে সহজ উপায়ে আয় করার প্রিমিয়াম প্ল্যাটফর্ম!</b>
+
+✅ <b>ভিডিও বিজ্ঞাপন দেখে আনলিমিটেড ইনকাম</b>
+✅ <b>সোশ্যাল ট্যাক্স সম্পূর্ণ করে বড় রিওয়ার্ড</b>
+✅ <b>প্রতি রেফারে ইনস্ট্যান্ট ৳ ৫০.০০ টাকা</b>
+✅ <b>বিকাশ ও নগদে সরাসরি অটো উইথড্র</b></blockquote>
+
+🔗 <b>আপনার পার্সোনাল রেফারেল লিংক:</b>
+<code>{referral_link}</code>"""
+        hint_text = "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>"
+
+    bot.send_message(chat_id, welcome_text, reply_markup=inline_kb, disable_web_page_preview=True)
+    bot.send_message(chat_id, hint_text, reply_markup=get_main_keyboard(user_id))
+
+# =================================================================
+# ১. /start কমান্ড হ্যান্ডলার (সবার প্রথমে ভাষা নির্বাচন শো করবে)
 # =================================================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -349,33 +403,40 @@ def send_welcome(message):
 
     threading.Thread(target=handle_referral_and_user_creation, args=(user_id, full_name, username, referrer_id)).start()
 
-    referral_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-
-    inline_kb = types.InlineKeyboardMarkup(row_width=1)
-    webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={user_id}"
-    btn_webapp = types.InlineKeyboardButton(text="🚀 ওপেন আর্নিং অ্যাপ 📱", web_app=types.WebAppInfo(url=webapp_url))
-    
-    # ✅ পরিচ্ছন্ন শেয়ার লিংক (ডাবল লিংক মুক্ত)
-    share_text = "🔥 MH EARNING BOT-এ জয়েন করে প্রতিদিন ফ্রি টাকা ইনকাম করুন!\n\n🚀 প্রতি রেফারে পাবেন ইনস্ট্যান্ট ৫০ টাকা বোনাস!"
-    share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
-    btn_share = types.InlineKeyboardButton(text="📢 বন্ধুদের শেয়ার করুন 🎁", url=share_url)
-
-    inline_kb.add(btn_webapp, btn_share)
-
-    welcome_text = f"""👑 <b>MH EARNING BOT PREMIER</b> 👑
+    lang_prompt = """🌐 <b>ভাষা নির্বাচন করুন / Please select your language</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>✨ <b>ঘরে বসে সহজ উপায়ে আয় করার প্রিমিয়াম প্ল্যাটফর্ম!</b>
+<blockquote>স্বাগতম! বটটি ব্যবহার করতে নিচের থেকে আপনার পছন্দের ভাষা নির্বাচন করুন:
+Welcome! Please choose your preferred language below:</blockquote>"""
 
-✅ <b>ভিডিও বিজ্ঞাপন দেখে আনলিমিটেড ইনকাম</b>
-✅ <b>সোশ্যাল ট্যাক্স সম্পূর্ণ করে বড় রিওয়ার্ড</b>
-✅ <b>প্রতি রেফারে ইনস্ট্যান্ট ৳ ৫০.০০ টাকা</b>
-✅ <b>বিকাশ ও নগদে সরাসরি অটো উইথড্র</b></blockquote>
+    bot.send_message(message.chat.id, lang_prompt, reply_markup=get_language_inline_keyboard())
 
-🔗 <b>আপনার পার্সোনাল রেফারেল লিংক:</b>
-<code>{referral_link}</code>"""
+# 🌐 ভাষা বাটনে ক্লিক করলে কলব্যাক হ্যান্ডলার
+@bot.callback_query_handler(func=lambda call: call.data in ["setlang_bn", "setlang_en"])
+def language_selection_callback(call):
+    user_id = str(call.from_user.id)
+    selected_lang = "bn" if call.data == "setlang_bn" else "en"
 
-    bot.send_message(message.chat.id, welcome_text, reply_markup=inline_kb, disable_web_page_preview=True)
-    bot.send_message(message.chat.id, "👇 <b>নিচের মেন্যু থেকে অপশন বেছে নিন:</b>", reply_markup=get_main_keyboard(user_id))
+    update_user_in_db(user_id, {"language": selected_lang})
+
+    try:
+        # আগের ভাষা নির্বাচনের মেসেজটি কেটে দেওয়া
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+
+    bot.answer_callback_query(call.id, "✅ ভাষা সফলভাবে নির্বাচন করা হয়েছে!" if selected_lang == "bn" else "✅ Language selected successfully!")
+    
+    # এরপর স্বয়ংক্রিয়ভাবে মূল ড্যাশবোর্ড ও কিবোর্ড পাঠানো
+    send_main_dashboard(call.message.chat.id, user_id, lang=selected_lang)
+
+# 🌐 কিবোর্ড থেকে ভাষা পরিবর্তন হ্যান্ডলার
+@bot.message_handler(func=lambda msg: msg.text in ["🌐 ভাষা পরিবর্তন", "/language", "ভাষা পরিবর্তন", "language", "Change Language"])
+def change_language_handler(message):
+    lang_prompt = """🌐 <b>ভাষা পরিবর্তন করুন / Change Language</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন:
+Choose a language from the buttons below:</blockquote>"""
+    bot.send_message(message.chat.id, lang_prompt, reply_markup=get_language_inline_keyboard())
 
 # =================================================================
 # 👑 অ্যাডমিন প্যানেল ওপেন হ্যান্ডলার
@@ -1107,7 +1168,6 @@ def refer_handler(message):
     total_refs = int(user_data.get("referrals", 0))
     earned_from_refs = total_refs * current_refer_reward
 
-    # ✅ পরিচ্ছন্ন শেয়ার মেসেজ (একবারই লিংক যাবে)
     share_text = f"🔥 MH EARNING BOT-এ জয়েন করে টাকা ইনকাম শুরু করুন!\n🚀 প্রতি রেফারে পাবেন ৳ {current_refer_reward:.2f} টাকা ইনস্ট্যান্ট বোনাস!"
     share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
 

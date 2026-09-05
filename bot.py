@@ -160,6 +160,15 @@ def verify_telegram_membership(channel_username, user_id):
         print(f"Channel Verify Error: {e}")
     return False
 
+# ✨ নামের দৈর্ঘ্য সুন্দর ও সমান রাখার ফাংশন
+def clean_display_name(name, max_length=12):
+    if not name:
+        return "User"
+    name = str(name).strip().replace("<", "").replace(">", "")
+    if len(name) > max_length:
+        return name[:max_length] + "..."
+    return name
+
 # =================================================================
 # 👥 রেফারেল ও একাউন্ট হ্যান্ডলার
 # =================================================================
@@ -557,7 +566,6 @@ def process_admin_input(message):
     user_id = str(message.from_user.id)
     state = admin_states.get(user_id)
     
-    # টেক্সট অথবা মিডিয়া ক্যাপশন থেকে টেক্সট যাচাই
     text = (message.text or message.caption or "").strip()
 
     if text.lower() == "/cancel":
@@ -702,12 +710,11 @@ def process_admin_input(message):
             success, failed = 0, 0
             for uid in user_list:
                 try:
-                    # copy_message এর মাধ্যমে টেক্সট, ফটো, ভিডিও ক্যাপশন ও ফরম্যাটসহ কপি হয়
                     bot.copy_message(chat_id=int(uid), from_chat_id=chat_id_src, message_id=msg_id_src)
                     success += 1
                 except Exception:
                     failed += 1
-                time.sleep(0.04) # টেলিগ্রাম রেট লিমিট হ্যান্ডলার
+                time.sleep(0.04)
 
             report_msg = f"""🎉 <b>ব্রডকাস্ট সফলভাবে সম্পন্ন হয়েছে!</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1076,7 +1083,7 @@ def balance_handler(message):
     bot.send_message(message.chat.id, msg_text, reply_markup=bal_kb)
 
 # =================================================================
-# ৬. রেফার বাটন হ্যান্ডলার (শুধু ইনভাইট ও রেফার লিংক শেয়ার)
+# ৬. রেফার বাটন হ্যান্ডলার
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 রেফার 🎁", "/refer"])
 def refer_handler(message):
@@ -1119,18 +1126,19 @@ def leaderboard_menu_handler(message):
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🌟 <i>আমাদের প্ল্যাটফর্মের সেরা লিডার ও আপনার নিজস্ব সফল রেফারেলদের বিস্তারিত তথ্য দেখতে নিচের যেকোনো অপশন নির্বাচন করুন:</i>
 
-🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> শীর্ষ ১০ জন রেফারকারীর নাম ও তাদের রেফার সংখ্যা
-👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা সদস্যদের নাম ও ডান পাশে তাদের ব্যালেন্স
+🥇 <b>/🏆 টপ ১০ লিডারবোর্ড:</b> শীর্ষ ১০ জন রেফারকারীর তালিকা
+👥 <b>/👥 আমার রেফারেল:</b> আপনার রেফার করা সদস্যদের নাম ও বর্তমান ব্যালেন্স
 🔙 <b>/🔙 ব্যাক:</b> পূর্ববর্তী মূল মেন্যুতে ফিরে যান</blockquote>
 
 👇 <i>নিচের কিবোর্ড থেকে অপশন বেছে নিন:</i>"""
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
 # =================================================================
-# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড হ্যান্ডলার
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড হ্যান্ডলার (আপডেটেড ও পরিচ্ছন্ন)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
+    current_uid = str(message.from_user.id)
     all_users = get_all_users_from_db()
 
     user_list = []
@@ -1138,19 +1146,28 @@ def top_10_leaderboard_handler(message):
         if isinstance(udata, dict):
             refs = int(udata.get("referrals", 0))
             name = udata.get("name", "User")
-            user_list.append({"id": uid, "name": name, "refs": refs})
+            user_list.append({"id": str(uid), "name": name, "refs": refs})
 
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
+
+    # নিজের বর্তমান অবস্থান ও রেফার খোঁজা
+    user_rank = "N/A"
+    user_refs = 0
+    for idx, u in enumerate(user_list, 1):
+        if u["id"] == current_uid:
+            user_rank = f"#{idx}"
+            user_refs = u["refs"]
+            break
 
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
     leader_lines = []
     for idx, usr in enumerate(top_10):
-        badge = medals[idx] if idx < len(medals) else f"#{idx+1}"
-        u_name = usr['name']
+        badge = medals[idx] if idx < len(medals) else f"{idx+1}."
+        disp_name = clean_display_name(usr['name'], max_length=12)
         ref_cnt = usr['refs']
-        leader_lines.append(f"{badge} <b>{u_name}</b> — <b>{ref_cnt} জন রেফার</b>")
+        leader_lines.append(f"{badge} <b>{disp_name}</b> -- রেফার <b>{ref_cnt} জন</b>")
 
     if not leader_lines:
         leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
@@ -1161,14 +1178,18 @@ def top_10_leaderboard_handler(message):
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>👑 <b>সর্বোচ্চ রেফারকারী সেরা ১০ সদস্য:</b>
 
-{top_text}</blockquote>
+{top_text}
 
-🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন বিশেষ সম্মাননা ও রিওয়ার্ড!</i>"""
+─────────────────────────
+👤 <b>আপনার অবস্থান:</b> <b>{user_rank}</b>
+👥 <b>আপনার মোট রেফার:</b> <b>{user_refs} জন</b></blockquote>
+
+🚀 <i>বেশি বেশি রেফার করুন এবং লিডারবোর্ডের শীর্ষে উঠে জিতে নিন আকর্ষণীয় বোনাস!</i>"""
 
     bot.send_message(message.chat.id, res_msg)
 
 # =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (আপডেটেড ও পরিচ্ছন্ন)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
 def my_referrals_list_handler(message):
@@ -1218,16 +1239,16 @@ def my_referrals_list_handler(message):
 
     ref_lines = []
     for idx, r in enumerate(top_my_refs, 1):
-        u_name = r['name']
+        disp_name = clean_display_name(r['name'], max_length=12)
         bal = r['balance']
-        line = f"<b>{idx}. 👤 {u_name}</b> ──────── <b>৳ {bal:.2f}</b>"
+        line = f"<b>{idx}. 👤 {disp_name}</b> -- ব্যালেন্স <b>৳ {bal:.2f}</b>"
         ref_lines.append(line)
 
     joined_list_str = "\n".join(ref_lines)
 
-    my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা (টপ ১০)</b>
+    my_ref_text = f"""👥 <b>আমার রেফারেল মেম্বার তালিকা</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>📊 <b>মোট রেফারেল:</b> <b>{total_refs_count} জন</b>
+<blockquote>📊 <b>আপনার সর্বমোট রেফার:</b> <b>{total_refs_count} জন</b>
 
 {joined_list_str}</blockquote>
 

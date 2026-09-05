@@ -160,14 +160,22 @@ def verify_telegram_membership(channel_username, user_id):
         print(f"Channel Verify Error: {e}")
     return False
 
-# ✨ নামের দৈর্ঘ্য সুন্দর ও সমান রাখার ফাংশন
-def clean_display_name(name, max_length=12):
-    if not name:
-        return "User"
-    name = str(name).strip().replace("<", "").replace(">", "")
-    if len(name) > max_length:
-        return name[:max_length] + "..."
-    return name
+# =================================================================
+# 📐 লিডারবোর্ড ফর্মেটিং ইঞ্জিন (একদম সমান সাইজ রাখার জন্য)
+# =================================================================
+def format_aligned_name(name, total_width=14):
+    clean_name = str(name).strip().replace("<", "").replace(">", "")
+    if len(clean_name) > total_width - 2:
+        # নাম বড় হলে কেটে .. যুক্ত করা
+        disp = clean_name[:total_width - 4] + ".."
+    else:
+        disp = clean_name + ".."
+    
+    # বাকি জায়গা _ দিয়ে সমান করে সোজা লাইন বানানো
+    remaining = total_width - len(disp)
+    if remaining > 0:
+        disp += "_" * remaining
+    return disp
 
 # =================================================================
 # 👥 রেফারেল ও একাউন্ট হ্যান্ডলার
@@ -532,7 +540,6 @@ def admin_search_user_handler(message):
     msg = bot.send_message(message.chat.id, "🔍 যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b> পাঠান:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
-# ✅ আপগ্রেডেড অল ব্রডকাস্ট প্রম্পট
 @bot.message_handler(func=lambda msg: msg.text == "📢 অল ব্রডকাস্ট")
 def admin_broadcast_prompt(message):
     user_id = str(message.from_user.id)
@@ -560,7 +567,7 @@ def admin_back_to_user_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id))
 
 # =================================================================
-# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (সহ অল-মিডিয়া ব্রডকাস্ট ইঞ্জিন)
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস
 # =================================================================
 def process_admin_input(message):
     user_id = str(message.from_user.id)
@@ -696,7 +703,6 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # 🚀 ফটো, ভিডিও, টেক্সট সহ ফুল ব্রডকাস্ট হ্যান্ডলার
     elif state == "adm_broadcast_msg":
         all_users = get_all_users_from_db()
         user_list = list(all_users.keys())
@@ -1134,7 +1140,7 @@ def leaderboard_menu_handler(message):
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard())
 
 # =================================================================
-# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড হ্যান্ডলার (আপডেটেড ও পরিচ্ছন্ন)
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (একদম সোজা লাইনে পারফেক্ট ফর্মেট)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "/🏆 টপ ১০ লিডারবোর্ড", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
@@ -1151,7 +1157,7 @@ def top_10_leaderboard_handler(message):
     user_list.sort(key=lambda x: x["refs"], reverse=True)
     top_10 = user_list[:10]
 
-    # নিজের বর্তমান অবস্থান ও রেফার খোঁজা
+    # নিজের বর্তমান অবস্থান ও রেফার
     user_rank = "N/A"
     user_refs = 0
     for idx, u in enumerate(user_list, 1):
@@ -1165,9 +1171,11 @@ def top_10_leaderboard_handler(message):
     leader_lines = []
     for idx, usr in enumerate(top_10):
         badge = medals[idx] if idx < len(medals) else f"{idx+1}."
-        disp_name = clean_display_name(usr['name'], max_length=12)
+        aligned_name = format_aligned_name(usr['name'], total_width=16)
         ref_cnt = usr['refs']
-        leader_lines.append(f"{badge} <b>{disp_name}</b> -- রেফার <b>{ref_cnt} জন</b>")
+        
+        # 📌 নির্দিষ্ট সোজা ফর্মেট: Badge <code>Name..____</code> 18 রেফার
+        leader_lines.append(f"{badge} <code>{aligned_name}</code>  <b>{ref_cnt:2d} রেফার</b>")
 
     if not leader_lines:
         leader_lines.append("<i>বর্তমানে কোনো লিডারবোর্ড ডাটা পাওয়া যায়নি!</i>")
@@ -1189,7 +1197,7 @@ def top_10_leaderboard_handler(message):
     bot.send_message(message.chat.id, res_msg)
 
 # =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার (আপডেটেড ও পরিচ্ছন্ন)
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (সোজা ও পরিচ্ছন্ন ফর্মেট)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "/👥 আমার রেফারেল", "আমার রেফারেল", "আমার রেফার"])
 def my_referrals_list_handler(message):
@@ -1239,10 +1247,11 @@ def my_referrals_list_handler(message):
 
     ref_lines = []
     for idx, r in enumerate(top_my_refs, 1):
-        disp_name = clean_display_name(r['name'], max_length=12)
+        aligned_name = format_aligned_name(r['name'], total_width=16)
         bal = r['balance']
-        line = f"<b>{idx}. 👤 {disp_name}</b> -- ব্যালেন্স <b>৳ {bal:.2f}</b>"
-        ref_lines.append(line)
+        
+        # 📌 নির্দিষ্ট সোজা ফর্মেট: 1. 👤 <code>Name..____</code> ৳ 50.00
+        ref_lines.append(f"<b>{idx:2d}.</b> 👤 <code>{aligned_name}</code>  <b>৳ {bal:.2f}</b>")
 
     joined_list_str = "\n".join(ref_lines)
 

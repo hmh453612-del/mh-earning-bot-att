@@ -122,6 +122,15 @@ def add_task_to_db(task_data):
         print(f"Add Task Error: {e}")
         return False
 
+def update_task_in_db(task_id, task_data):
+    try:
+        url = f"{FIREBASE_DB_URL}/tasks/{task_id}.json"
+        res = requests.patch(url, json=task_data, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Update Task Error: {e}")
+        return False
+
 def delete_task_from_db(task_id):
     try:
         url = f"{FIREBASE_DB_URL}/tasks/{task_id}.json"
@@ -242,7 +251,6 @@ def handle_referral_and_user_creation(user_id, full_name, username, referrer_id)
 
                     notify_kb = types.InlineKeyboardMarkup(row_width=2)
                     webapp_url = f"{MINI_APP_URL}#tgWebAppStartParam={referrer_id}"
-                    
                     share_link = f"https://t.me/{BOT_USERNAME}?start={referrer_id}"
 
                     if ref_lang == "en":
@@ -429,7 +437,7 @@ def send_main_dashboard(chat_id, user_id, lang="bn"):
     bot.send_message(chat_id, hint_text, reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
-# ১. /start কমান্ড হ্যান্ডলার (সবার প্রথমে ভাষা নির্বাচন)
+# ১. /start কমান্ড হ্যান্ডলার
 # =================================================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -908,7 +916,7 @@ def leaderboard_menu_handler(message):
     bot.send_message(message.chat.id, text, reply_markup=get_leaderboard_keyboard(lang=lang))
 
 # =================================================================
-# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (Bilingual & 1 Line Format)
+# 🥇 ১. লাইভ গ্লোবাল টপ ১০ রেফার লিডারবোর্ড (Bilingual)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🏆 টপ ১০ লিডারবোর্ড", "🏆 Top 10 Leaderboard", "টপ ১০", "top 10"])
 def top_10_leaderboard_handler(message):
@@ -979,7 +987,7 @@ def top_10_leaderboard_handler(message):
     bot.send_message(message.chat.id, res_msg)
 
 # =================================================================
-# 👥 ২. আমার রেফারেল হ্যান্ডলার (Bilingual & 1 Line Format)
+# 👥 ২. আমার রেফারেল হ্যান্ডলার (Bilingual)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["👥 আমার রেফারেল", "👥 My Referrals", "আমার রেফারেল", "my referrals"])
 def my_referrals_list_handler(message):
@@ -1125,8 +1133,8 @@ def admin_panel_open(message):
 ⚙️ <b>অ্যাপ সেটিংস:</b> রিওয়ার্ড ও উইথড্র লিমিট চেঞ্জ
 💰 <b>ব্যালেন্স পরিবর্তন:</b> ইউজার ব্যালেন্স যোগ/বিয়োগ
 ➕ <b>নতুন টাস্ক:</b> সরাসরি চ্যানেল টাস্ক এড করুন
-📋 <b>টাস্ক ডিলিট:</b> সক্রিয় টাস্ক তালিকা ও মুছে ফেলা
-🔍 <b>ইউজার সার্চ:</b> ইউজারের বিস্তারিত একাউন্ট তথ্য
+📋 <b>টাস্ক ম্যানেজমেন্ট:</b> টাস্ক দেখা, এডিট বা ডিলিট
+🔍 <b>ইউজার সার্চ:</b> আইডি, নাম বা যেকোনো অক্ষর দিয়ে সার্চ
 📢 <b>অল ব্রডকাস্ট:</b> সকল ইউজারকে নোটিফিকেশন পাঠানো (টেক্সট/ছবি/ভিডিও)</blockquote>
 
 👇 <i>যেকোনো একটি বাটন চেপে কাজ শুরু করুন:</i>"""
@@ -1244,6 +1252,7 @@ def admin_add_task_step1(message):
     msg = bot.send_message(message.chat.id, "📝 <b>টাস্কের নাম বা টাইটেল দিন:</b>\n<i>(যেমন: Join Telegram Channel)</i>\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
 
+# 📋 টাস্ক ম্যানেজমেন্ট (এডিট ও ডিলিট অপশন সহ)
 @bot.message_handler(func=lambda msg: msg.text == "📋 টাস্ক ম্যানেজমেন্ট")
 def admin_manage_tasks_handler(message):
     user_id = str(message.from_user.id)
@@ -1254,23 +1263,31 @@ def admin_manage_tasks_handler(message):
         bot.send_message(message.chat.id, "📋 <b>বর্তমানে কোনো টাস্ক যুক্ত নেই!</b>")
         return
 
-    bot.send_message(message.chat.id, "📋 <b>বর্তমানে চালু থাকা টাস্ক তালিকা:</b>")
+    bot.send_message(message.chat.id, "📋 <b>বর্তমানে চালু থাকা টাস্ক তালিকা (এডিট বা ডিলিট করুন):</b>")
     for tid, t in all_tasks.items():
         if isinstance(t, dict):
             t_text = f"""🔹 <b>{t.get('title')}</b>
 💰 <b>রিওয়ার্ড:</b> ৳ {float(t.get('reward', 0)):.2f}
-🔗 <b>লিংক:</b> {t.get('link')}"""
-            kb = types.InlineKeyboardMarkup()
-            kb.add(types.InlineKeyboardButton("🗑️ এই টাস্কটি মুছে ফেলুন", callback_data=f"del_task_{tid}"))
+🔗 <b>লিংক:</b> {t.get('link', t.get('url', ''))}"""
+            kb = types.InlineKeyboardMarkup(row_width=2)
+            kb.add(
+                types.InlineKeyboardButton("✏️ এডিট করুন", callback_data=f"ed_task_menu_{tid}"),
+                types.InlineKeyboardButton("🗑️ মুছে ফেলুন", callback_data=f"del_task_{tid}")
+            )
             bot.send_message(message.chat.id, t_text, reply_markup=kb, disable_web_page_preview=True)
 
+# 🔍 উন্নত ইউজার তথ্য সার্চ হ্যান্ডলার
 @bot.message_handler(func=lambda msg: msg.text == "🔍 ইউজার তথ্য খুঁজুন")
 def admin_search_user_handler(message):
     user_id = str(message.from_user.id)
     if not is_admin(user_id): return
 
     admin_states[user_id] = "adm_search_user"
-    msg = bot.send_message(message.chat.id, "🔍 যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b> পাঠান:\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    guide = """🔍 <b>ইউজার সার্চ ইঞ্জিন</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+<blockquote>যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b>, <b>নাম (Name)</b> অথবা <b>ইউজারনেম</b>-এর যেকোনো অক্ষর বা অংশ লিখে পাঠান:</blockquote>
+<i>(বাতিল করতে <b>/cancel</b> লিখুন)</i>"""
+    msg = bot.send_message(message.chat.id, guide)
     bot.register_next_step_handler(msg, process_admin_input)
 
 @bot.message_handler(func=lambda msg: msg.text == "📢 অল ব্রডকাস্ট")
@@ -1301,7 +1318,7 @@ def admin_back_to_user_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
-# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (Search & Edit System সহ)
 # =================================================================
 def process_admin_input(message):
     user_id = str(message.from_user.id)
@@ -1414,27 +1431,72 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ টাস্ক যুক্ত করতে ব্যর্থ হয়েছে। ডাটাবেজ চেক করুন.", reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    elif state == "adm_search_user":
-        target_uid = text
-        u_data = get_user_from_db(target_uid)
-        if not u_data:
-            bot.send_message(message.chat.id, "❌ এই আইডির কোনো ইউজার পাওয়া যায়নি!", reply_markup=get_admin_keyboard())
+    # ✏️ টাস্ক এডিট ইনপুট হ্যান্ডলারসমূহ
+    elif state and state.startswith("adm_edtask_title_"):
+        task_id = state.replace("adm_edtask_title_", "")
+        if update_task_in_db(task_id, {"title": text}):
+            bot.send_message(message.chat.id, f"✅ <b>টাস্ক টাইটেল পরিবর্তন সফল হয়েছে!</b>\nনতুন টাইটেল: <b>{text}</b>", reply_markup=get_admin_keyboard())
         else:
-            joined_date = "N/A"
-            if u_data.get("joinedAt"):
-                joined_date = datetime.fromtimestamp(u_data.get("joinedAt")/1000).strftime('%d/%m/%Y %I:%M %p')
+            bot.send_message(message.chat.id, "❌ টাইটেল আপডেট ব্যর্থ হয়েছে!", reply_markup=get_admin_keyboard())
+        admin_states.pop(user_id, None)
+
+    elif state and state.startswith("adm_edtask_rew_"):
+        task_id = state.replace("adm_edtask_rew_", "")
+        try:
+            new_rew = float(text)
+            if update_task_in_db(task_id, {"reward": new_rew}):
+                bot.send_message(message.chat.id, f"✅ <b>টাস্ক রিওয়ার্ড আপডেট সফল হয়েছে!</b>\nনতুন রিওয়ার্ড: <b>৳ {new_rew:.2f} টাকা</b>", reply_markup=get_admin_keyboard())
+            else:
+                bot.send_message(message.chat.id, "❌ রিওয়ার্ড আপডেট ব্যর্থ হয়েছে!", reply_markup=get_admin_keyboard())
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ সঠিক সংখ্যামান লিখুন!", reply_markup=get_admin_keyboard())
+        admin_states.pop(user_id, None)
+
+    elif state and state.startswith("adm_edtask_link_"):
+        task_id = state.replace("adm_edtask_link_", "")
+        if update_task_in_db(task_id, {"link": text}):
+            bot.send_message(message.chat.id, f"✅ <b>টাস্ক লিংক আপডেট সফল হয়েছে!</b>\nনতুন লিংক: {text}", reply_markup=get_admin_keyboard(), disable_web_page_preview=True)
+        else:
+            bot.send_message(message.chat.id, "❌ লিংক আপডেট ব্যর্থ হয়েছে!", reply_markup=get_admin_keyboard())
+        admin_states.pop(user_id, None)
+
+    # 🔍 উন্নত ইউজার অনুসন্ধান প্রসেসর (আইডি/নাম/অক্ষর অনুযায়ী)
+    elif state == "adm_search_user":
+        query = text.strip().lower()
+        all_users = get_all_users_from_db()
+
+        matched_users = []
+        for uid, udata in all_users.items():
+            if isinstance(udata, dict):
+                uid_str = str(uid).lower()
+                name_str = str(udata.get("name", "")).lower()
+                uname_str = str(udata.get("username", "")).lower()
+
+                if query in uid_str or query in name_str or query in uname_str:
+                    matched_users.append((uid, udata))
+
+        if not matched_users:
+            bot.send_message(message.chat.id, f"❌ '<b>{text}</b>' দিয়ে কোনো ইউজার খুঁজে পাওয়া যায়নি!", reply_markup=get_admin_keyboard())
+        else:
+            bot.send_message(message.chat.id, f"🔍 <b>মোট {len(matched_users)} জন ইউজার খুঁজে পাওয়া গেছে:</b>", reply_markup=get_admin_keyboard())
             
-            u_info = f"""👤 <b>ইউজার প্রোফাইল ডাটাবেজ</b>
+            for target_uid, u_data in matched_users[:15]:  # সেরা ১৫ জন প্রদর্শন করবে
+                joined_date = "N/A"
+                if u_data.get("joinedAt"):
+                    joined_date = datetime.fromtimestamp(u_data.get("joinedAt") / 1000).strftime('%d/%m/%Y %I:%M %p')
+                
+                u_info = f"""👤 <b>ইউজার প্রোফাইল</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 <blockquote>🆔 <b>টেলিগ্রাম আইডি:</b> <code>{target_uid}</code>
 🏷️ <b>নাম:</b> {u_data.get('name', 'N/A')}
 🔗 <b>ইউজারনেম:</b> {u_data.get('username', 'N/A')}
-💵 <b>ব্যালেন্স:</b> <b>৳ {float(u_data.get('balance', 0.0)):.2f}</b>
-👥 <b>রেফার করেছে:</b> {u_data.get('referrals', 0)} জন
+💵 <b>ব্যালেন্স:</b> <b>৳ {float(u_data.get('balance', 0.0)):.2f} টাকা</b>
+👥 <b>রেফার করেছে:</b> <b>{u_data.get('referrals', 0)} জন</b>
 🎬 <b>দেখা ভিডিও:</b> {u_data.get('adsWatched', 0)} টি
 ✅ <b>টাস্ক সম্পন্ন:</b> {u_data.get('completedTasksCount', 0)} টি
 📅 <b>জয়েন তারিখ:</b> {joined_date}</blockquote>"""
-            bot.send_message(message.chat.id, u_info, reply_markup=get_admin_keyboard())
+                bot.send_message(message.chat.id, u_info)
+
         admin_states.pop(user_id, None)
 
     elif state == "adm_broadcast_msg":
@@ -1487,6 +1549,64 @@ def admin_settings_callback(call):
         "adm_set_adlimit": "📊 প্রতিদিন কতটি ভিডিও অ্যাড দেখাতে চান? (যেমন: 15)"
     }
     msg = bot.send_message(call.message.chat.id, f"📝 <b>ইনপুট প্রদান করুন:</b>\n{prompt_map[action]}\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
+    bot.register_next_step_handler(msg, process_admin_input)
+    bot.answer_callback_query(call.id)
+
+# ✏️ টাস্ক এডিট সাব-মেন্যু কলব্যাক
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ed_task_menu_"))
+def admin_edit_task_menu(call):
+    user_id = str(call.from_user.id)
+    if not is_admin(user_id): return
+    task_id = call.data.replace("ed_task_menu_", "")
+    
+    tasks = get_all_tasks_from_db()
+    task = tasks.get(task_id)
+    if not task:
+        bot.answer_callback_query(call.id, "❌ টাস্ক পাওয়া যায়নি!", show_alert=True)
+        return
+    
+    edit_text = f"""✏️ <b>টাস্ক এডিট কন্ট্রোল প্যানেল</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━
+🔹 <b>বর্তমান টাইটেল:</b> {task.get('title')}
+💰 <b>বর্তমান রিওয়ার্ড:</b> ৳ {float(task.get('reward', 0)):.2f}
+🔗 <b>বর্তমান লিংক:</b> {task.get('link', task.get('url', ''))}
+
+👇 <i>আপনি কোনটি পরিবর্তন করতে চান নির্বাচন করুন:</i>"""
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("📝 টাইটেল এডিট", callback_data=f"ed_task_field_title_{task_id}"),
+        types.InlineKeyboardButton("💰 রিওয়ার্ড এডিট", callback_data=f"ed_task_field_rew_{task_id}"),
+        types.InlineKeyboardButton("🔗 লিংক এডিট", callback_data=f"ed_task_field_link_{task_id}"),
+        types.InlineKeyboardButton("🔙 বন্ধ করুন", callback_data="ed_task_close")
+    )
+    bot.send_message(call.message.chat.id, edit_text, reply_markup=kb, disable_web_page_preview=True)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ed_task_field_") or call.data == "ed_task_close")
+def admin_edit_task_field_callback(call):
+    user_id = str(call.from_user.id)
+    if not is_admin(user_id): return
+    
+    if call.data == "ed_task_close":
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        return
+
+    parts = call.data.split("_")
+    field = parts[3]
+    task_id = parts[4]
+
+    admin_states[user_id] = f"adm_edtask_{field}_{task_id}"
+
+    prompts = {
+        "title": "📝 <b>নতুন টাস্কের টাইটেল বা নাম লিখুন:</b>",
+        "rew": "💰 <b>নতুন রিওয়ার্ডের পরিমাণ লিখুন (যেমন: 10.00):</b>",
+        "link": "🔗 <b>নতুন লিংকটি প্রবেশ করান:</b>"
+    }
+    msg = bot.send_message(call.message.chat.id, f"{prompts.get(field, 'ইনপুট দিন:')}\n\n<i>(বাতিল করতে /cancel লিখুন)</i>")
     bot.register_next_step_handler(msg, process_admin_input)
     bot.answer_callback_query(call.id)
 

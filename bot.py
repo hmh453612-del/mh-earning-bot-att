@@ -1134,7 +1134,7 @@ def admin_panel_open(message):
 💰 <b>ব্যালেন্স পরিবর্তন:</b> ইউজার ব্যালেন্স যোগ/বিয়োগ
 ➕ <b>নতুন টাস্ক:</b> সরাসরি চ্যানেল টাস্ক এড করুন
 📋 <b>টাস্ক ম্যানেজমেন্ট:</b> টাস্ক দেখা, এডিট বা ডিলিট
-🔍 <b>ইউজার সার্চ:</b> আইডি, নাম বা যেকোনো অক্ষর দিয়ে সার্চ
+🔍 <b>ইউজার সার্চ:</b> আইডি, নাম, ইউজারনেম বা ব্যালেন্স দিয়ে সার্চ
 📢 <b>অল ব্রডকাস্ট:</b> সকল ইউজারকে নোটিফিকেশন পাঠানো (টেক্সট/ছবি/ভিডিও)</blockquote>
 
 👇 <i>যেকোনো একটি বাটন চেপে কাজ শুরু করুন:</i>"""
@@ -1276,7 +1276,7 @@ def admin_manage_tasks_handler(message):
             )
             bot.send_message(message.chat.id, t_text, reply_markup=kb, disable_web_page_preview=True)
 
-# 🔍 উন্নত ইউজার তথ্য সার্চ হ্যান্ডলার
+# 🔍 উন্নত ইউজার তথ্য সার্চ হ্যান্ডলার (ব্যালেন্স সহ সার্চ অপশন)
 @bot.message_handler(func=lambda msg: msg.text == "🔍 ইউজার তথ্য খুঁজুন")
 def admin_search_user_handler(message):
     user_id = str(message.from_user.id)
@@ -1285,7 +1285,7 @@ def admin_search_user_handler(message):
     admin_states[user_id] = "adm_search_user"
     guide = """🔍 <b>ইউজার সার্চ ইঞ্জিন</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b>, <b>নাম (Name)</b> অথবা <b>ইউজারনেম</b>-এর যেকোনো অক্ষর বা অংশ লিখে পাঠান:</blockquote>
+<blockquote>যে ইউজারের তথ্য দেখতে চান তার <b>Telegram ID</b>, <b>নাম (Name)</b>, <b>ইউজারনেম</b> অথবা <b>ব্যালেন্সের পরিমাণ (যেমন: 50 বা 100.00)</b> লিখে পাঠান:</blockquote>
 <i>(বাতিল করতে <b>/cancel</b> লিখুন)</i>"""
     msg = bot.send_message(message.chat.id, guide)
     bot.register_next_step_handler(msg, process_admin_input)
@@ -1318,7 +1318,7 @@ def admin_back_to_user_menu(message):
     bot.send_message(message.chat.id, "🏠 <b>মূল ইউজার মেন্যুতে ফিরে আসা হয়েছে:</b>", reply_markup=get_main_keyboard(user_id, lang=lang))
 
 # =================================================================
-# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (Search & Edit System সহ)
+# 👑 অ্যাডমিন ইনপুট প্রসেসিং স্টেপস (Search by Balance, ID & Name)
 # =================================================================
 def process_admin_input(message):
     user_id = str(message.from_user.id)
@@ -1460,10 +1460,18 @@ def process_admin_input(message):
             bot.send_message(message.chat.id, "❌ লিংক আপডেট ব্যর্থ হয়েছে!", reply_markup=get_admin_keyboard())
         admin_states.pop(user_id, None)
 
-    # 🔍 উন্নত ইউজার অনুসন্ধান প্রসেসর (আইডি/নাম/অক্ষর অনুযায়ী)
+    # 🔍 উন্নত ইউজার অনুসন্ধান প্রসেসর (আইডি, নাম, ইউজারনেম এবং ব্যালেন্স অনুযায়ী)
     elif state == "adm_search_user":
         query = text.strip().lower()
         all_users = get_all_users_from_db()
+
+        # ব্যালেন্স দিয়ে সার্চ চেক করার জন্য সংখ্যা যাচাই
+        is_num = False
+        try:
+            q_num = float(query.replace("৳", "").replace("bdt", "").replace("tk", "").strip())
+            is_num = True
+        except ValueError:
+            q_num = None
 
         matched_users = []
         for uid, udata in all_users.items():
@@ -1471,8 +1479,12 @@ def process_admin_input(message):
                 uid_str = str(uid).lower()
                 name_str = str(udata.get("name", "")).lower()
                 uname_str = str(udata.get("username", "")).lower()
+                user_bal = float(udata.get("balance", 0.0))
 
-                if query in uid_str or query in name_str or query in uname_str:
+                # ১. আইডি, নাম অথবা ইউজারনেম দিয়ে ম্যাচিং
+                # ২. ব্যালেন্সের সঠিক পরিমাণ দিয়ে ম্যাচিং
+                if (query in uid_str or query in name_str or query in uname_str) or \
+                   (is_num and (abs(user_bal - q_num) < 0.001 or f"{user_bal:.2f}" == f"{q_num:.2f}")):
                     matched_users.append((uid, udata))
 
         if not matched_users:
@@ -1480,7 +1492,7 @@ def process_admin_input(message):
         else:
             bot.send_message(message.chat.id, f"🔍 <b>মোট {len(matched_users)} জন ইউজার খুঁজে পাওয়া গেছে:</b>", reply_markup=get_admin_keyboard())
             
-            for target_uid, u_data in matched_users[:15]:  # সেরা ১৫ জন প্রদর্শন করবে
+            for target_uid, u_data in matched_users[:25]:  # সেরা ২৫ জন প্রদর্শন করবে
                 joined_date = "N/A"
                 if u_data.get("joinedAt"):
                     joined_date = datetime.fromtimestamp(u_data.get("joinedAt") / 1000).strftime('%d/%m/%Y %I:%M %p')

@@ -14,7 +14,8 @@ from telebot import types
 BOT_TOKEN = "8862120350:AAGAbapwq17iwwGGuTbTjW8COWskalp2EKE"
 BOT_USERNAME = "mhearningxl_bot"
 MINI_APP_URL = "https://mhearningbot.blogspot.com/?m=1"
-SUPPORT_USERNAME = "mh_earning_bot_admin"
+SUPPORT_WHATSAPP = "+48699540816"
+SUPPORT_WHATSAPP_URL = "https://wa.me/48699540816"
 
 # ✅ লাইভ Firebase Realtime DB URL
 FIREBASE_DB_URL = "https://mh-earning-bot-all-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -1072,7 +1073,7 @@ def my_referrals_list_handler(message):
     bot.send_message(message.chat.id, my_ref_text)
 
 # =================================================================
-# ৭. সাপোর্ট বাটন হ্যান্ডলার (Bilingual)
+# ৭. সাপোর্ট বাটন হ্যান্ডলার (হোয়াটসঅ্যাপ লিঙ্ক সহ Bilingual)
 # =================================================================
 @bot.message_handler(func=lambda msg: msg.text in ["🛠️ সাপোর্ট 💬", "🛠️ Support 💬", "/support"])
 def support_handler(message):
@@ -1080,27 +1081,27 @@ def support_handler(message):
     lang = get_user_lang(user_id)
 
     sup_kb = types.InlineKeyboardMarkup(row_width=1)
-    btn_admin_text = "👨‍💻 Admin Live Support 💬" if lang == "en" else "👨‍💻 এডমিন লাইভ সাপোর্ট 💬"
-    sup_kb.add(types.InlineKeyboardButton(text=btn_admin_text, url=f"https://t.me/{SUPPORT_USERNAME}"))
+    btn_admin_text = "💬 WhatsApp Admin Support" if lang == "en" else "💬 হোয়াটসঅ্যাপ এডমিন সাপোর্ট"
+    sup_kb.add(types.InlineKeyboardButton(text=btn_admin_text, url=SUPPORT_WHATSAPP_URL))
 
     if lang == "en":
         msg_text = f"""🛠️ <b>Help & Support Center</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>For any help regarding cashout or tasks, talk directly with our official admin.
+<blockquote>For any help regarding cashout, balance, or tasks, chat directly with our official admin on WhatsApp.
 
 ⏰ <b>Support Hours:</b> 9:00 AM - 11:00 PM
-👤 <b>Official Admin:</b> @{SUPPORT_USERNAME}</blockquote>
+📱 <b>WhatsApp:</b> <code>{SUPPORT_WHATSAPP}</code></blockquote>
 
-👇 <i>Tap the button below to message admin:</i>"""
+👇 <i>Tap the button below to message admin directly on WhatsApp:</i>"""
     else:
         msg_text = f"""🛠️ <b>হেল্প ও সাপোর্ট সেন্টার</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-<blockquote>পেমেন্ট বা কাজ সংক্রান্ত যেকোনো সহায়তার জন্য সরাসরি আমাদের অফিসিয়াল এডমিনের সাথে কথা বলুন।
+<blockquote>পেমেন্ট, ব্যালেন্স বা কাজ সংক্রান্ত যেকোনো সহায়তার জন্য সরাসরি আমাদের অফিসিয়াল এডমিনের সাথে হোয়াটসঅ্যাপে কথা বলুন।
 
 ⏰ <b>সাপোর্ট সময়:</b> সকাল ৯:০০ টা - রাত ১১:০০ টা
-👤 <b>অফিসিয়াল এডমিন:</b> @{SUPPORT_USERNAME}</blockquote>
+📱 <b>হোয়াটসঅ্যাপ নম্বর:</b> <code>{SUPPORT_WHATSAPP}</code></blockquote>
 
-👇 <i>এডমিনকে মেসেজ দিতে নিচের বাটনে ট্যাপ করুন:</i>"""
+👇 <i>এডমিনকে হোয়াটসঅ্যাপে মেসেজ দিতে নিচের বাটনে ট্যাপ করুন:</i>"""
 
     bot.send_message(message.chat.id, msg_text, reply_markup=sup_kb)
 
